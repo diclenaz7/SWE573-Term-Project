@@ -1,13 +1,19 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
+WORKDIR /app
 
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /code
+# install deps
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-COPY requirements.txt /code/
-RUN pip3 install --no-cache-dir -r requirements.txt
+# copy project
+COPY . .
 
-COPY . /code/
+# Cloud Run will set PORT
+ENV PORT=8080
 
+# Django DB will come from env vars, see below
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT appsite.wsgi:application"]
