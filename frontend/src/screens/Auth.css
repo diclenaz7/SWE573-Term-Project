@@ -1,8 +1,10 @@
 .page-container {
   width: 100%;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
 }
 
 .auth-container {
@@ -136,4 +138,3 @@
 .auth-link a:hover {
   text-decoration: underline;
 }
-
