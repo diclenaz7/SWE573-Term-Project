@@ -14,6 +14,9 @@ class UserProfileInline(admin.StackedInline):
 # Extend the User admin to include UserProfile
 class UserAdmin(BaseUserAdmin):
     inlines = (UserProfileInline,)
+    list_display = ['username', 'email', 'first_name', 'last_name', 'is_staff', 'is_superuser', 'date_joined']
+    list_filter = ['is_staff', 'is_superuser', 'is_active', 'date_joined']
+    search_fields = ['username', 'email', 'first_name', 'last_name']
 
 
 # Re-register UserAdmin

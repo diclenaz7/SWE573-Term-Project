@@ -5,6 +5,7 @@ This app contains the core data models for The Hive platform, a community-driven
 ## Overview
 
 The Hive enables users to:
+
 - **Offer** services or help to the community
 - **Request** help or services (needs)
 - **Express interest** in offers or needs
@@ -14,9 +15,11 @@ The Hive enables users to:
 ## Models
 
 ### UserProfile
+
 Extends Django's built-in `User` model with community-specific information.
 
 **Fields:**
+
 - `user` (OneToOne): Links to Django User
 - `bio` (TextField): User biography (max 500 chars)
 - `location` (CharField): General location description
@@ -26,6 +29,7 @@ Extends Django's built-in `User` model with community-specific information.
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
 **Usage:**
+
 ```python
 from django.contrib.auth.models import User
 from core.models import UserProfile
@@ -45,15 +49,18 @@ profile = UserProfile.objects.create(
 ---
 
 ### Tag
+
 Semantic tags for categorizing offers and needs.
 
 **Fields:**
+
 - `name` (CharField): Tag name (unique, max 50 chars)
 - `slug` (SlugField): URL-friendly version (unique)
 - `description` (TextField): Optional description
 - `created_at` (DateTimeField): Creation timestamp
 
 **Usage:**
+
 ```python
 from core.models import Tag
 
@@ -74,9 +81,11 @@ tag, created = Tag.objects.get_or_create(
 ---
 
 ### Offer
+
 Services or help that users are offering to the community.
 
 **Fields:**
+
 - `user` (ForeignKey): Creator of the offer
 - `title` (CharField): Offer title (min 5 chars)
 - `description` (TextField): Detailed description (min 20 chars)
@@ -90,10 +99,12 @@ Services or help that users are offering to the community.
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
 **Methods:**
+
 - `is_expired()`: Check if offer has expired
 - Auto-updates status to `expired` if expiration date passed
 
 **Usage:**
+
 ```python
 from core.models import Offer, Tag
 from django.utils import timezone
@@ -124,9 +135,11 @@ if offer.is_expired():
 ---
 
 ### Need
+
 Services or help that users are requesting from the community.
 
 **Fields:**
+
 - `user` (ForeignKey): Creator of the need
 - `title` (CharField): Need title (min 5 chars)
 - `description` (TextField): Detailed description (min 20 chars)
@@ -140,10 +153,12 @@ Services or help that users are requesting from the community.
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
 **Methods:**
+
 - `is_expired()`: Check if need has expired
 - Auto-updates status to `closed` if expiration date passed
 
 **Usage:**
+
 ```python
 from core.models import Need
 
@@ -162,9 +177,11 @@ need = Need.objects.create(
 ---
 
 ### OfferInterest
+
 Represents a user's interest in an offer created by someone else.
 
 **Fields:**
+
 - `offer` (ForeignKey): The offer of interest
 - `user` (ForeignKey): User expressing interest
 - `status` (CharField): `pending`, `accepted`, `declined`, `withdrawn`
@@ -172,9 +189,11 @@ Represents a user's interest in an offer created by someone else.
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
 **Constraints:**
+
 - Unique together: `(offer, user)` - prevents duplicate interests
 
 **Usage:**
+
 ```python
 from core.models import OfferInterest
 
@@ -194,9 +213,11 @@ interest.save()
 ---
 
 ### NeedInterest
+
 Represents a user's interest in helping with a need created by someone else.
 
 **Fields:**
+
 - `need` (ForeignKey): The need of interest
 - `user` (ForeignKey): User offering to help
 - `status` (CharField): `pending`, `accepted`, `declined`, `withdrawn`
@@ -204,9 +225,11 @@ Represents a user's interest in helping with a need created by someone else.
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
 **Constraints:**
+
 - Unique together: `(need, user)` - prevents duplicate interests
 
 **Usage:**
+
 ```python
 from core.models import NeedInterest
 
@@ -226,9 +249,11 @@ interest.save()
 ---
 
 ### Handshake
+
 Represents a finalized agreement between two users after an interest has been accepted and both parties agree to proceed.
 
 **Fields:**
+
 - `offer_interest` (OneToOne): The offer interest (if applicable)
 - `need_interest` (OneToOne): The need interest (if applicable)
 - `user1` (ForeignKey): First user (offer/need creator)
@@ -240,14 +265,17 @@ Represents a finalized agreement between two users after an interest has been ac
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
 **Validation:**
+
 - Must have exactly one of `offer_interest` or `need_interest` (not both, not neither)
 
 **Methods:**
+
 - `get_offer()`: Returns associated offer if applicable
 - `get_need()`: Returns associated need if applicable
 - `get_other_user(user)`: Gets the other user in the handshake
 
 **Usage:**
+
 ```python
 from core.models import Handshake
 from django.utils import timezone
@@ -283,9 +311,11 @@ other_user = handshake.get_other_user(current_user)
 ---
 
 ### Message
+
 Messages between users regarding offers, needs, or general communication.
 
 **Fields:**
+
 - `offer_interest` (ForeignKey): Optional - message in context of offer interest
 - `need_interest` (ForeignKey): Optional - message in context of need interest
 - `handshake` (ForeignKey): Optional - message within active handshake
@@ -296,6 +326,7 @@ Messages between users regarding offers, needs, or general communication.
 - `created_at` (DateTimeField): Creation timestamp
 
 **Usage:**
+
 ```python
 from core.models import Message
 
@@ -448,11 +479,13 @@ need.save()
 ## Querying Examples
 
 ### Get Active Offers
+
 ```python
 active_offers = Offer.objects.filter(status='active')
 ```
 
 ### Get Offers with Specific Tags
+
 ```python
 gardening_offers = Offer.objects.filter(
     tags__name='Gardening',
@@ -461,6 +494,7 @@ gardening_offers = Offer.objects.filter(
 ```
 
 ### Get Urgent Needs
+
 ```python
 urgent_needs = Need.objects.filter(
     is_urgent=True,
@@ -469,6 +503,7 @@ urgent_needs = Need.objects.filter(
 ```
 
 ### Get Pending Interests for User's Offers
+
 ```python
 my_offers = Offer.objects.filter(user=current_user)
 pending_interests = OfferInterest.objects.filter(
@@ -478,6 +513,7 @@ pending_interests = OfferInterest.objects.filter(
 ```
 
 ### Get User's Active Handshakes
+
 ```python
 active_handshakes = Handshake.objects.filter(
     models.Q(user1=current_user) | models.Q(user2=current_user),
@@ -486,6 +522,7 @@ active_handshakes = Handshake.objects.filter(
 ```
 
 ### Get Unread Messages
+
 ```python
 unread_messages = Message.objects.filter(
     recipient=current_user,
@@ -494,6 +531,7 @@ unread_messages = Message.objects.filter(
 ```
 
 ### Get Messages in a Handshake
+
 ```python
 handshake_messages = Message.objects.filter(
     handshake=handshake
@@ -505,16 +543,19 @@ handshake_messages = Message.objects.filter(
 ## Database Setup
 
 ### Create Migrations
+
 ```bash
 python manage.py makemigrations core
 ```
 
 ### Apply Migrations
+
 ```bash
 python manage.py migrate
 ```
 
 ### Create Superuser (for admin access)
+
 ```bash
 python manage.py createsuperuser
 ```
@@ -526,6 +567,7 @@ python manage.py createsuperuser
 All models are registered in the Django admin interface. Access at `/admin/` after creating a superuser.
 
 **Admin Features:**
+
 - User profiles inline with User admin
 - Filterable and searchable lists for all models
 - Date hierarchies for time-based filtering
@@ -584,6 +626,7 @@ Message
 ## Status Workflows
 
 ### Offer Status Flow
+
 ```
 active → fulfilled
 active → paused → active
@@ -591,12 +634,14 @@ active → expired (automatic)
 ```
 
 ### Need Status Flow
+
 ```
 open → in_progress → fulfilled
 open → closed (automatic if expired)
 ```
 
 ### Interest Status Flow
+
 ```
 pending → accepted → (handshake created)
 pending → declined
@@ -604,6 +649,7 @@ pending → withdrawn
 ```
 
 ### Handshake Status Flow
+
 ```
 active → in_progress → completed
 active → cancelled
@@ -620,6 +666,58 @@ in_progress → completed
 4. **Handle unique constraints** - catch `IntegrityError` when creating interests
 5. **Update timestamps** - use `auto_now` and `auto_now_add` fields
 6. **Clean data** - use model's `clean()` method for validation
+
+---
+
+## Populating Mock Data
+
+A Django management command is available to populate the database with test data for development and presentation purposes.
+
+### Usage
+
+```bash
+# Populate database with mock data
+python manage.py populate_mock_data
+
+# Clear existing mock data and repopulate
+python manage.py populate_mock_data --clear
+```
+
+### What it creates:
+
+- **12 Users** with profiles (usernames: gardening_guru, tech_helper, cooking_mom, pet_lover, new_parent, elderly_neighbor, student_helper, car_owner, handyman_joe, tutor_sarah, chef_mike, driver_alex)
+  - All users have password: `testpass123`
+  - Profiles include bios, locations, and coordinates
+- **20 Tags** for categorizing offers and needs (gardening, technology, cooking, pets, childcare, etc.)
+
+- **8 Offers** including:
+
+  - Free Gardening Help
+  - Computer Troubleshooting
+  - Home-Cooked Meal Delivery
+  - Pet Sitting Services
+  - Basic Home Repairs
+  - Math and Science Tutoring
+  - Cooking Lessons
+  - Rides and Delivery Services
+
+- **6 Needs** including:
+
+  - Babysitting for Doctor Appointment
+  - Help Moving Furniture
+  - Math Tutoring Needed
+  - Car Battery Jump Start
+  - House Cleaning Help
+  - Grocery Shopping Assistance
+
+- **Sample Interests and Handshakes** to demonstrate the workflow
+
+### Notes:
+
+- The command is idempotent - safe to run multiple times
+- Uses `get_or_create` to avoid duplicates
+- Only clears data when using `--clear` flag
+- Test users can be logged in with username and password `testpass123`
 
 ---
 
@@ -642,4 +740,3 @@ in_progress → completed
 - Unique constraints prevent duplicate interests
 - Handshake validation ensures data integrity
 - All foreign keys use `CASCADE` deletion for data consistency
-
