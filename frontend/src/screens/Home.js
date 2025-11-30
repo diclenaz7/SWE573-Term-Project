@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import Header from "../components/common/header";
 import "./Home.css";
+import { BASE_URL } from "../constants";
+import { getAuthHeaders, removeToken } from "../utils/auth";
 
 function Home() {
   const [user, setUser] = useState(null);
@@ -12,14 +14,19 @@ function Home() {
 
   const fetchUser = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/auth/user/", {
-        credentials: "include",
+      const headers = getAuthHeaders();
+      const response = await fetch(`${BASE_URL}/api/auth/user/`, {
+        method: "GET",
+        headers: headers,
+        credentials: "include", // Still include for Chrome compatibility
       });
-
       if (response.ok) {
         const data = await response.json();
+        console.log("Response data fetchUser", data);
         setUser(data);
       } else if (response.status === 401) {
+        // Token might be invalid, clear it
+        removeToken();
         setUser(null);
       }
     } catch (error) {
@@ -32,13 +39,19 @@ function Home() {
 
   const handleLogout = async () => {
     try {
-      await fetch("http://localhost:8000/api/auth/logout/", {
+      const headers = getAuthHeaders();
+      await fetch(`${BASE_URL}/api/auth/logout/`, {
         method: "POST",
-        credentials: "include",
+        headers: headers,
+        credentials: "include", // Still include for Chrome compatibility
       });
+      // Clear token from localStorage
+      removeToken();
       setUser(null);
     } catch (error) {
       console.error("Logout error:", error);
+      // Clear token even if request fails
+      removeToken();
       setUser(null);
     }
   };
@@ -51,6 +64,7 @@ function Home() {
     );
   }
 
+  console.log("User", user);
   return (
     <div className="page-container">
       <Header user={user} onLogout={handleLogout} />

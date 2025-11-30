@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 COPY . .
 
 # Cloud Run will set PORT
-ENV PORT=8080
+ENV PORT=8000
 
 # Django DB will come from env vars, see below
 CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT appsite.wsgi:application"]

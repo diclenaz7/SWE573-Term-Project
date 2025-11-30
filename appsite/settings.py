@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-2+g-mi6*cqlyfgk7oy-+1x-3w6bwbrs)k2z#&5_g&-cp$kmi0e
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*', 'django-app-494208442673.europe-west1.run.app']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'django-app-494208442673.europe-west1.run.app']
 
 
 # Application definition
@@ -53,10 +53,44 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "https://django-app-494208442673.europe-west1.run.app",
+    "https://react-frontend-494208442673.europe-west1.run.app",
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    "https://django-app-494208442673.europe-west1.run.app",
+    "https://react-frontend-494208442673.europe-west1.run.app",
+]
 
+
+
+CORS_ALLOW_CREDENTIALS = True
+# Expose headers that might be needed
+CORS_EXPOSE_HEADERS = ['Content-Type', 'Authorization']
+# Allow all headers in requests
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+# Ensure session cookie is accessible across origins
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_AGE = 86400  # 24 hours
+# Use database-backed sessions for reliability
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 ROOT_URLCONF = 'appsite.urls'
 
@@ -87,7 +121,25 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DATABASES = {
+# Check if running in Cloud Run (Cloud SQL socket exists) or locally (Docker Compose)
+CLOUD_SQL_SOCKET = "/cloudsql/dicleshive:europe-west1:django-postgres"
+is_cloud_run = os.path.exists(CLOUD_SQL_SOCKET)
+
+if is_cloud_run:
+    # Production: Use Cloud SQL Unix socket
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "HOST": CLOUD_SQL_SOCKET,
+            "PORT": os.environ.get("DB_PORT", "5432"),
+            "NAME": os.environ.get("DB_NAME", "django_db"),
+            "USER": os.environ.get("DB_USER", "django_user"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "django_pass"),
+        }
+    }
+else:
+    # Local development: Use SQLite (no setup required)
+    DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "HOST": "db",
@@ -96,7 +148,7 @@ DATABASES = {
         "USER": os.environ.get("DB_USER", "django_user"),
         "PASSWORD": os.environ.get("DB_PASSWORD", "django_pass"),
     }
-}
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -143,3 +195,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Cache configuration for token storage
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
