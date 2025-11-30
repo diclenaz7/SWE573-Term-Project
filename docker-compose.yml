@@ -20,6 +20,14 @@ services:
       - "8000:8000"
     depends_on:
       - db
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=django_db
+      - DB_USER=django_user
+      - DB_PASSWORD=django_pass
+      - USE_POSTGRES=true
+      - POPULATE_MOCK_DATA=true # Set to true to populate mock data on startup
     develop:
       watch:
         - action: sync

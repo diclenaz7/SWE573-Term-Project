@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "../components/common/header";
 import "./Home.css";
 import { BASE_URL } from "../constants";
 import { getAuthHeaders, removeToken } from "../utils/auth";
+import { mockFeed, mockOffers, mockNeeds, formatDate } from "../data/mockData";
 
 function Home() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("All");
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchUser();
@@ -18,14 +22,13 @@ function Home() {
       const response = await fetch(`${BASE_URL}/api/auth/user/`, {
         method: "GET",
         headers: headers,
-        credentials: "include", // Still include for Chrome compatibility
+        credentials: "include",
       });
       if (response.ok) {
         const data = await response.json();
         console.log("Response data fetchUser", data);
         setUser(data);
       } else if (response.status === 401) {
-        // Token might be invalid, clear it
         removeToken();
         setUser(null);
       }
@@ -43,18 +46,35 @@ function Home() {
       await fetch(`${BASE_URL}/api/auth/logout/`, {
         method: "POST",
         headers: headers,
-        credentials: "include", // Still include for Chrome compatibility
+        credentials: "include",
       });
-      // Clear token from localStorage
       removeToken();
       setUser(null);
     } catch (error) {
       console.error("Logout error:", error);
-      // Clear token even if request fails
       removeToken();
       setUser(null);
     }
   };
+
+  const handleGetStarted = () => {
+    navigate("/register");
+  };
+
+  // Filter feed items based on active tab
+  const filteredFeed = useMemo(() => {
+    if (!user) return [];
+
+    switch (activeTab) {
+      case "Offers":
+        return mockOffers.map((offer) => ({ ...offer, type: "offer" }));
+      case "Needs":
+        return mockNeeds.map((need) => ({ ...need, type: "need" }));
+      case "All":
+      default:
+        return mockFeed;
+    }
+  }, [activeTab, user]);
 
   if (loading) {
     return (
@@ -64,44 +84,122 @@ function Home() {
     );
   }
 
-  console.log("User", user);
   return (
     <div className="page-container">
-      <Header user={user} onLogout={handleLogout} />
-      <div className="home-container">
-        <div className="welcome-section">
-          <h1>Welcome to The Hive</h1>
-          {user ? (
-            <p className="subtitle">Hello, {user.username}! 👋</p>
-          ) : (
-            <p className="subtitle">Please log in to continue</p>
+      <Header user={user} onLogout={handleLogout} onMenuToggle={() => {}} />
+      <div className="home-layout">
+        <div className="main-content">
+          {/* Hero Section */}
+          <section className="hero-section">
+            <div className="hero-content">
+              <h1 className="hero-title">Welcome to The Hive</h1>
+              <p className="hero-description">
+                {user
+                  ? `Hello, ${user.username}! Connect with your community and make a difference.`
+                  : "A community platform where neighbors help neighbors. Share services, request help, and build stronger connections."}
+              </p>
+              {!user && (
+                <button className="hero-cta" onClick={handleGetStarted}>
+                  Get Started
+                </button>
+              )}
+            </div>
+          </section>
+
+          {/* Tabs and Map View - Only visible when logged in */}
+          {user && (
+            <>
+              <section className="tabs-section">
+                <div className="tabs">
+                  <button
+                    className={`tab ${activeTab === "All" ? "active" : ""}`}
+                    onClick={() => setActiveTab("All")}
+                  >
+                    All
+                  </button>
+                  <button
+                    className={`tab ${activeTab === "Offers" ? "active" : ""}`}
+                    onClick={() => setActiveTab("Offers")}
+                  >
+                    Offers
+                  </button>
+                  <button
+                    className={`tab ${activeTab === "Needs" ? "active" : ""}`}
+                    onClick={() => setActiveTab("Needs")}
+                  >
+                    Needs
+                  </button>
+                </div>
+              </section>
+
+              <section className="map-view-section">
+                <div className="map-view-placeholder">
+                  <p className="map-view-label">Map View</p>
+                  <p className="map-view-note">Map integration coming soon</p>
+                </div>
+              </section>
+
+              {/* Feed Section */}
+              <section className="feed-section">
+                <h2 className="feed-title">Feed</h2>
+                <div className="feed-content">
+                  {filteredFeed.length === 0 ? (
+                    <div className="feed-item">
+                      <p className="feed-empty-message">
+                        No items to display yet. Check back soon!
+                      </p>
+                    </div>
+                  ) : (
+                    filteredFeed.map((item) => (
+                      <div
+                        key={`${item.type}-${item.id}`}
+                        className="feed-item"
+                      >
+                        <div className="feed-item-header">
+                          <div className="feed-item-type">
+                            <span className={`type-badge type-${item.type}`}>
+                              {item.type === "offer" ? "📋 Offer" : "📝 Need"}
+                            </span>
+                            {item.is_urgent && (
+                              <span className="urgent-badge">Urgent</span>
+                            )}
+                          </div>
+                          <span className="feed-item-time">
+                            {formatDate(item.created_at)}
+                          </span>
+                        </div>
+                        <h3 className="feed-item-title">{item.title}</h3>
+                        <p className="feed-item-description">
+                          {item.description}
+                        </p>
+                        <div className="feed-item-footer">
+                          <div className="feed-item-meta">
+                            <span className="feed-item-author">
+                              by {item.user.username}
+                            </span>
+                            {item.location && (
+                              <span className="feed-item-location">
+                                📍 {item.location}
+                              </span>
+                            )}
+                          </div>
+                          {item.tags && item.tags.length > 0 && (
+                            <div className="feed-item-tags">
+                              {item.tags.map((tag) => (
+                                <span key={tag.id} className="tag">
+                                  {tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            </>
           )}
-        </div>
-
-        {user && (
-          <div className="user-info">
-            <div className="user-info-item">
-              <span className="user-info-label">Username:</span>
-              <span className="user-info-value">{user.username}</span>
-            </div>
-            <div className="user-info-item">
-              <span className="user-info-label">Email:</span>
-              <span className="user-info-value">
-                {user.email || "Not provided"}
-              </span>
-            </div>
-            <div className="user-info-item">
-              <span className="user-info-label">Status:</span>
-              <span className="user-info-value">Active</span>
-            </div>
-          </div>
-        )}
-
-        <div className="actions-grid">
-          <a href="#" className="action-card">
-            <h3>📊 Dashboard</h3>
-            <p>View your analytics</p>
-          </a>
         </div>
       </div>
     </div>

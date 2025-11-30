@@ -12,20 +12,22 @@ A full-stack web application built with Django REST API backend and React fronte
 - [Installation & Setup](#installation--setup)
 
 ## Overview
-The Hive is a community-driven web application that helps people connect, support each other, and exchange services in a spirit of reciprocity. By enabling users to offer help, request assistance, and collaborate, The Hive aims to create stronger, more resilient local networks.
 
+The Hive is a community-driven web application that helps people connect, support each other, and exchange services in a spirit of reciprocity. By enabling users to offer help, request assistance, and collaborate, The Hive aims to create stronger, more resilient local networks.
 
 **Problem**: Existing gig platforms optimize for monetization, not mutual aid; they create asymmetry between providers and consumers and de‑prioritize community.
 
 **Vision**: A virtual commons where people exchange unordinary services and stories as equals using time as the currency. Offers and needs are discoverable on a map, described with semantic tags instead of resumes or ratings.
 Primary outcomes
-* Lower barriers to asking for help and contributing.
-* Reciprocity by design (give and receive).
-* Safety without surveillance: light‑touch moderation + community oversight.
+
+- Lower barriers to asking for help and contributing.
+- Reciprocity by design (give and receive).
+- Safety without surveillance: light‑touch moderation + community oversight.
 
 ## Tech Stack
 
 ### Backend
+
 - **Framework**: Django 5.1.2
 - **Language**: Python 3.12
 - **Database**: PostgreSQL 16
@@ -34,6 +36,7 @@ Primary outcomes
 - **Database Driver**: psycopg2-binary 2.9.9
 
 ### Frontend
+
 - **Framework**: React 19.2.0
 - **Build Tool**: Create React App (react-scripts 5.0.1)
 - **Routing**: React Router DOM 7.9.6
@@ -41,6 +44,7 @@ Primary outcomes
 - **Node Version**: Node.js 18
 
 ### DevOps
+
 - **Containerization**: Docker & Docker Compose
 - **Development**: Hot reload enabled for both services
 - **Production**: Optimized Dockerfiles for deployment
@@ -76,6 +80,7 @@ Before you begin, ensure you have the following installed:
 - **Git**
 
 For local development without Docker:
+
 - **Python** 3.12+
 - **Node.js** 18+
 - **PostgreSQL** 16+ (or use SQLite for development)
@@ -85,32 +90,37 @@ For local development without Docker:
 ### Using Docker (Recommended)
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd the-hive-django
    ```
 
 2. **Start the services**
+
    ```bash
    docker-compose up --build
    ```
 
    This will start:
+
    - PostgreSQL database on port `5432`
    - Django backend on port `8000`
    - React frontend on port `3000`
 
-3. **Run database migrations** (in a new terminal)
-   ```bash
-   docker-compose exec web python manage.py migrate
-   ```
+   **Note**: The Django container automatically:
 
-4. **Create a superuser** (optional)
+   - Waits for the database to be ready
+   - Runs migrations
+   - Populates mock data (if `POPULATE_MOCK_DATA=true` in docker-compose.yml)
+
+3. **Create a superuser** (optional, for admin access)
+
    ```bash
    docker-compose exec web python manage.py createsuperuser
    ```
 
-5. **Access the application**
+4. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - Django Admin: http://localhost:8000/admin
@@ -120,12 +130,14 @@ For local development without Docker:
 #### Backend Setup
 
 1. **Create a virtual environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 2. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -133,6 +145,7 @@ For local development without Docker:
 3. **Set up environment variables** (see [Environment Variables](#environment-variables))
 
 4. **Run migrations**
+
    ```bash
    python manage.py migrate
    ```
@@ -145,11 +158,13 @@ For local development without Docker:
 #### Frontend Setup
 
 1. **Navigate to frontend directory**
+
    ```bash
    cd frontend
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
@@ -172,16 +187,19 @@ The `docker-compose.yml` includes watch mode for hot reloading:
 ### Running Commands
 
 **Django management commands:**
+
 ```bash
 docker-compose exec web python manage.py <command>
 ```
 
 **Frontend commands:**
+
 ```bash
 docker-compose exec frontend npm <command>
 ```
 
 **View logs:**
+
 ```bash
 docker-compose logs -f [service_name]  # e.g., web, frontend, db
 ```
@@ -189,16 +207,29 @@ docker-compose logs -f [service_name]  # e.g., web, frontend, db
 ### Database Management
 
 **Create migrations:**
+
 ```bash
 docker-compose exec web python manage.py makemigrations
 ```
 
 **Apply migrations:**
+
 ```bash
 docker-compose exec web python manage.py migrate
 ```
 
+**Populate mock data:**
+
+```bash
+docker-compose exec web python manage.py populate_mock_data
+# Or to clear and repopulate:
+docker-compose exec web python manage.py populate_mock_data --clear
+```
+
+**Note**: Mock data is automatically populated on container startup if `POPULATE_MOCK_DATA=true` is set in `docker-compose.yml`.
+
 **Access PostgreSQL shell:**
+
 ```bash
 docker-compose exec db psql -U django_user -d django_db
 ```
