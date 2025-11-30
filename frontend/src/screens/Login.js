@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./Auth.css";
+import { BASE_URL } from "../constants";
+import { setToken } from "../utils/auth";
 
 function Login() {
   const [username, setUsername] = useState("");
@@ -14,8 +16,10 @@ function Login() {
     setErrors({});
     setMessage("");
 
+    console.log(`${BASE_URL}/api/auth/login/`, { username, password });
+
     try {
-      const response = await fetch("http://localhost:8000/api/auth/login/", {
+      const response = await fetch(`${BASE_URL}/api/auth/login/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -25,8 +29,15 @@ function Login() {
       });
 
       const data = await response.json();
+      console.log("Response data", data);
 
       if (response.ok) {
+        // Store token for Safari compatibility (works without cookies)
+        if (data.token) {
+          setToken(data.token);
+        }
+        // Small delay to ensure cookie is processed by browser (for Chrome)
+        await new Promise((resolve) => setTimeout(resolve, 100));
         navigate("/");
       } else {
         if (data.errors) {
