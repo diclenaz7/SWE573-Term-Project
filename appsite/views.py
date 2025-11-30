@@ -4,7 +4,28 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.core.cache import cache
+from django.contrib.auth.models import User
 import json
+import secrets
+
+
+def generate_token():
+    """Generate a secure random token."""
+    return secrets.token_urlsafe(32)
+
+
+def get_user_from_token(token):
+    """Get user from token stored in cache."""
+    if not token:
+        return None
+    user_id = cache.get(f'auth_token_{token}')
+    if user_id:
+        try:
+            return User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return None
+    return None
 
 
 @csrf_exempt
@@ -24,14 +45,27 @@ def api_login(request):
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
+            # Generate token for Safari compatibility (works without cookies)
+            token = generate_token()
+            # Store token in cache for 24 hours (86400 seconds)
+            cache.set(f'auth_token_{token}', user.id, 86400)
+            
+            # Also maintain session for Chrome compatibility
+            if not request.session.exists(request.session.session_key):
+                request.session.create()
             login(request, user)
-            return JsonResponse({
+            request.session.modified = True
+            request.session.save()
+            
+            response = JsonResponse({
                 'message': 'Login successful',
                 'user': {
                     'username': user.username,
                     'email': user.email or ''
-                }
+                },
+                'token': token  # Return token for Safari
             })
+            return response
         else:
             return JsonResponse({
                 'errors': {'non_field_errors': ['Invalid username or password.']}
@@ -50,6 +84,14 @@ def api_login(request):
 @require_http_methods(["POST"])
 def api_logout(request):
     """API endpoint for user logout."""
+    # Get token from Authorization header
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        # Remove token from cache
+        cache.delete(f'auth_token_{token}')
+    
+    # Also logout session for Chrome compatibility
     logout(request)
     return JsonResponse({'message': 'Logout successful'})
 
@@ -85,13 +127,31 @@ def api_register(request):
         }, status=500)
 
 
-@login_required
+@csrf_exempt
 @require_http_methods(["GET"])
 def api_user(request):
     """API endpoint to get current user information."""
+    user = None
+    
+    # Try token-based authentication first (for Safari)
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        user = get_user_from_token(token)
+    
+    # Fall back to session-based authentication (for Chrome)
+    if not user and request.user.is_authenticated:
+        user = request.user
+    
+    if not user:
+        return JsonResponse(
+            {"detail": "Authentication required"},
+            status=401,
+        )
+
     return JsonResponse({
-        'username': request.user.username,
-        'email': request.user.email or ''
+        "username": user.username,
+        "email": user.email or "",
     })
 
 
