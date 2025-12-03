@@ -63,7 +63,7 @@
 }
 
 .logo-text {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 700;
   color: #333;
   letter-spacing: 0.5px;
@@ -75,11 +75,12 @@
   color: white;
   border: none;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+  margin-left: 36px;
 }
 
 .signup-profile-btn:hover {
@@ -149,6 +150,7 @@
 
 .header-nav-item-label {
   font-weight: 500;
+  font-size: 18px;
 }
 
 @media (max-width: 768px) {
@@ -156,4 +158,3 @@
     display: none;
   }
 }
-
