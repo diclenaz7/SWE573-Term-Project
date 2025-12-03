@@ -6,12 +6,28 @@ function Header({ user, onLogout, onMenuToggle }) {
   const navigate = useNavigate();
 
   const menuItems = [
-    { label: "Offer Service", icon: "📋" },
-    { label: "Request Need", icon: "📝" },
-    { label: "In your area", icon: "📍" },
-    { label: "People", icon: "👥" },
-    { label: "Community Activity / Forum", icon: "💬" },
-    { label: "Settings", icon: "⚙️" },
+    {
+      label: "Create Offer",
+      icon: "📋",
+      onClick: () => navigate("/create-offer"),
+    },
+    {
+      label: "Create Need",
+      icon: "📝",
+      onClick: () => navigate("/create-need"),
+    },
+    // {
+    //   label: "In your area",
+    //   icon: "📍",
+    //   onClick: () => navigate("/in-your-area"),
+    // },
+    { label: "People", icon: "👥", onClick: () => navigate("/people") },
+    {
+      label: "Messages",
+      icon: "💬",
+      onClick: () => navigate("/messages"),
+    },
+    { label: "Settings", icon: "⚙️", onClick: () => navigate("/settings") },
   ];
 
   const handleProfileClick = () => {
@@ -23,16 +39,15 @@ function Header({ user, onLogout, onMenuToggle }) {
     }
   };
 
-  const handleItemClick = (item) => {
-    // TODO: Implement navigation for each item
-    console.log(`Clicked: ${item.label}`);
-  };
-
   return (
     <header className="home-header">
       <nav className="home-nav">
         <div className="nav-left">
-          <button className="hamburger-menu" onClick={onMenuToggle} aria-label="Menu">
+          <button
+            className="hamburger-menu"
+            onClick={onMenuToggle}
+            aria-label="Menu"
+          >
             <span></span>
             <span></span>
             <span></span>
@@ -49,7 +64,7 @@ function Header({ user, onLogout, onMenuToggle }) {
                 <button
                   key={index}
                   className="header-nav-item"
-                  onClick={() => handleItemClick(item)}
+                  onClick={item.onClick}
                 >
                   <span className="header-nav-item-icon">{item.icon}</span>
                   <span className="header-nav-item-label">{item.label}</span>
@@ -58,10 +73,7 @@ function Header({ user, onLogout, onMenuToggle }) {
             </div>
           </div>
         )}
-        <button
-          className="signup-profile-btn"
-          onClick={handleProfileClick}
-        >
+        <button className="signup-profile-btn" onClick={handleProfileClick}>
           {user ? "Profile" : "Sign Up"}
         </button>
       </nav>
