@@ -160,9 +160,6 @@ function Home() {
                             <span className={`type-badge type-${item.type}`}>
                               {item.type === "offer" ? "📋 Offer" : "📝 Need"}
                             </span>
-                            {item.is_urgent && (
-                              <span className="urgent-badge">Urgent</span>
-                            )}
                           </div>
                           <span className="feed-item-time">
                             {formatDate(item.created_at)}

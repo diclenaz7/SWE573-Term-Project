@@ -74,10 +74,10 @@ All users have the password: `testpass123`
 8. Rides and Delivery Services
 
 ### Needs (6 total)
-1. Babysitting for Doctor Appointment (Urgent)
+1. Babysitting for Doctor Appointment
 2. Help Moving Furniture
 3. Math Tutoring Needed
-4. Car Battery Jump Start (Urgent)
+4. Car Battery Jump Start
 5. House Cleaning Help
 6. Grocery Shopping Assistance
 
