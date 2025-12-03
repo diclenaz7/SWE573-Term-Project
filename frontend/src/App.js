@@ -9,6 +9,7 @@ import Login from "./screens/Login";
 import Register from "./screens/Register";
 import Home from "./screens/Home";
 import CreateOffer from "./screens/CreateOffer";
+import CreateNeed from "./screens/CreateNeed";
 import "./App.css";
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<Home />} />
           <Route path="/create-offer" element={<CreateOffer />} />
+          <Route path="/create-need" element={<CreateNeed />} />
           {/* <Route path="*" element={<Navigate to="/" replace />} /> */}
         </Routes>
       </div>

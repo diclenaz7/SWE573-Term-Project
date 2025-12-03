@@ -134,7 +134,6 @@ class Need(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True, help_text="When this need expires")
     
     # Additional metadata
-    is_urgent = models.BooleanField(default=False)
     contact_preference = models.CharField(
         max_length=50, 
         default='message',
@@ -150,7 +149,6 @@ class Need(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status', '-created_at']),
-            models.Index(fields=['is_urgent', '-created_at']),
             models.Index(fields=['latitude', 'longitude']),
         ]
     

@@ -43,8 +43,8 @@ class OfferAdmin(admin.ModelAdmin):
 
 @admin.register(Need)
 class NeedAdmin(admin.ModelAdmin):
-    list_display = ['title', 'user', 'status', 'is_urgent', 'location', 'created_at', 'expires_at']
-    list_filter = ['status', 'is_urgent', 'created_at', 'expires_at']
+    list_display = ['title', 'user', 'status', 'location', 'created_at', 'expires_at']
+    list_filter = ['status', 'created_at', 'expires_at']
     search_fields = ['title', 'description', 'user__username', 'location']
     filter_horizontal = ['tags']
     readonly_fields = ['created_at', 'updated_at']

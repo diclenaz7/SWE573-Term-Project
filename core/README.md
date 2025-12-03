@@ -148,7 +148,6 @@ Services or help that users are requesting from the community.
 - `latitude` / `longitude` (DecimalField): Coordinates
 - `status` (CharField): `open`, `in_progress`, `fulfilled`, `closed`
 - `expires_at` (DateTimeField): Optional expiration date
-- `is_urgent` (Boolean): Urgency flag
 - `contact_preference` (CharField): `message`, `email`, `phone`, `any`
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
@@ -169,7 +168,6 @@ need = Need.objects.create(
     location="San Francisco, CA",
     latitude=37.7749,
     longitude=-122.4194,
-    is_urgent=False,
     contact_preference='email'
 )
 ```
@@ -438,8 +436,7 @@ need = Need.objects.create(
     user=alice,
     title="Need Math Tutoring",
     description="Looking for algebra help for my teenager.",
-    location="San Francisco, CA",
-    is_urgent=False
+    location="San Francisco, CA"
 )
 
 # 2. Another user offers to help
@@ -493,13 +490,6 @@ gardening_offers = Offer.objects.filter(
 ).distinct()
 ```
 
-### Get Urgent Needs
-
-```python
-urgent_needs = Need.objects.filter(
-    is_urgent=True,
-    status='open'
-)
 ```
 
 ### Get Pending Interests for User's Offers
