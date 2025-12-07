@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
@@ -25,4 +27,10 @@ urlpatterns = [
     path('api/auth/register/', views.api_register, name='api_register'),
     path('api/auth/user/', views.api_user, name='api_user'),
     path('api/hello/', views.hello_api, name='hello_api'),
+    path('api/offers/', views.api_offers, name='api_offers'),  # GET for listing, POST for creating
+    path('api/needs/', views.api_needs, name='api_needs'),  # GET for listing, POST for creating
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
