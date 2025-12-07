@@ -158,10 +158,10 @@ function CreateOffer() {
       }
 
       if (formData.minPeople) {
-        formDataToSend.append("min_people", formData.minPeople);
+        formDataToSend.append("minPeople", formData.minPeople);
       }
       if (formData.maxPeople) {
-        formDataToSend.append("max_people", formData.maxPeople);
+        formDataToSend.append("maxPeople", formData.maxPeople);
       }
 
       const response = await fetch(`${BASE_URL}/api/offers/`, {

@@ -83,6 +83,26 @@ class Offer(models.Model):
         ]
     )
     
+    # Image upload
+    image = models.ImageField(upload_to='offers/', blank=True, null=True, help_text="Image for the offer")
+    
+    # Offer-specific details
+    frequency = models.CharField(
+        max_length=50,
+        blank=True,
+        choices=[
+            ('one-time', 'One-time'),
+            ('weekly', 'Weekly'),
+            ('bi-weekly', 'Bi-weekly'),
+            ('monthly', 'Monthly'),
+            ('on-demand', 'On-demand'),
+        ],
+        help_text="How often this offer is available"
+    )
+    duration = models.CharField(max_length=50, blank=True, help_text="Duration of the offer (e.g., '1 Hour', '2 Hours')")
+    min_people = models.IntegerField(null=True, blank=True, help_text="Minimum number of people")
+    max_people = models.IntegerField(null=True, blank=True, help_text="Maximum number of people")
+    
     class Meta:
         ordering = ['-created_at']
         indexes = [
@@ -144,6 +164,9 @@ class Need(models.Model):
             ('any', 'Any method'),
         ]
     )
+    
+    # Image upload
+    image = models.ImageField(upload_to='needs/', blank=True, null=True, help_text="Image for the need")
     
     class Meta:
         ordering = ['-created_at']

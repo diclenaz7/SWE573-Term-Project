@@ -1,20 +1,31 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/common/header";
+import FeedCard from "../components/feed/FeedCard";
 import "./Home.css";
 import { BASE_URL } from "../constants";
 import { getAuthHeaders, removeToken } from "../utils/auth";
-import { mockFeed, mockOffers, mockNeeds, formatDate } from "../data/mockData";
 
 function Home() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("All");
+  const [offers, setOffers] = useState([]);
+  const [needs, setNeeds] = useState([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [loadingNeeds, setLoadingNeeds] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchOffers();
+      fetchNeeds();
+    }
+  }, [user]);
 
   const fetchUser = async () => {
     try {
@@ -61,20 +72,75 @@ function Home() {
     navigate("/register");
   };
 
+  const fetchOffers = async () => {
+    setLoadingOffers(true);
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch(`${BASE_URL}/api/offers/?status=active`, {
+        method: "GET",
+        headers: headers,
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setOffers(data.offers || []);
+      } else {
+        console.error("Failed to fetch offers");
+        setOffers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching offers:", error);
+      setOffers([]);
+    } finally {
+      setLoadingOffers(false);
+    }
+  };
+
+  const fetchNeeds = async () => {
+    setLoadingNeeds(true);
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch(`${BASE_URL}/api/needs/?status=open`, {
+        method: "GET",
+        headers: headers,
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setNeeds(data.needs || []);
+      } else {
+        console.error("Failed to fetch needs");
+        setNeeds([]);
+      }
+    } catch (error) {
+      console.error("Error fetching needs:", error);
+      setNeeds([]);
+    } finally {
+      setLoadingNeeds(false);
+    }
+  };
+
   // Filter feed items based on active tab
   const filteredFeed = useMemo(() => {
     if (!user) return [];
 
     switch (activeTab) {
       case "Offers":
-        return mockOffers.map((offer) => ({ ...offer, type: "offer" }));
+        return offers.map((offer) => ({ ...offer, type: "offer" }));
       case "Needs":
-        return mockNeeds.map((need) => ({ ...need, type: "need" }));
+        return needs.map((need) => ({ ...need, type: "need" }));
       case "All":
       default:
-        return mockFeed;
+        // Combine offers and needs, sort by created_at
+        const allItems = [
+          ...offers.map((offer) => ({ ...offer, type: "offer" })),
+          ...needs.map((need) => ({ ...need, type: "need" })),
+        ];
+        return allItems.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
     }
-  }, [activeTab, user]);
+  }, [activeTab, user, offers, needs]);
 
   if (loading) {
     return (
@@ -143,7 +209,11 @@ function Home() {
               <section className="feed-section">
                 <h2 className="feed-title">Feed</h2>
                 <div className="feed-content">
-                  {filteredFeed.length === 0 ? (
+                  {loadingOffers || loadingNeeds ? (
+                    <div className="feed-item">
+                      <p className="feed-empty-message">Loading...</p>
+                    </div>
+                  ) : filteredFeed.length === 0 ? (
                     <div className="feed-item">
                       <p className="feed-empty-message">
                         No items to display yet. Check back soon!
@@ -151,46 +221,7 @@ function Home() {
                     </div>
                   ) : (
                     filteredFeed.map((item) => (
-                      <div
-                        key={`${item.type}-${item.id}`}
-                        className="feed-item"
-                      >
-                        <div className="feed-item-header">
-                          <div className="feed-item-type">
-                            <span className={`type-badge type-${item.type}`}>
-                              {item.type === "offer" ? "📋 Offer" : "📝 Need"}
-                            </span>
-                          </div>
-                          <span className="feed-item-time">
-                            {formatDate(item.created_at)}
-                          </span>
-                        </div>
-                        <h3 className="feed-item-title">{item.title}</h3>
-                        <p className="feed-item-description">
-                          {item.description}
-                        </p>
-                        <div className="feed-item-footer">
-                          <div className="feed-item-meta">
-                            <span className="feed-item-author">
-                              by {item.user.username}
-                            </span>
-                            {item.location && (
-                              <span className="feed-item-location">
-                                📍 {item.location}
-                              </span>
-                            )}
-                          </div>
-                          {item.tags && item.tags.length > 0 && (
-                            <div className="feed-item-tags">
-                              {item.tags.map((tag) => (
-                                <span key={tag.id} className="tag">
-                                  {tag.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <FeedCard key={`${item.type}-${item.id}`} item={item} />
                     ))
                   )}
                 </div>
