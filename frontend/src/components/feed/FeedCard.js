@@ -1,12 +1,24 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { formatDate } from "../../data/mockData";
 import "./FeedCard.css";
 
 function FeedCard({ item }) {
+  const navigate = useNavigate();
   const typeLabel = item.type === "offer" ? "📋 Offer" : "📝 Need";
 
+  const handleClick = () => {
+    if (item.id) {
+      if (item.type === "need") {
+        navigate(`/needs/${item.id}`);
+      } else if (item.type === "offer") {
+        navigate(`/offers/${item.id}`);
+      }
+    }
+  };
+
   return (
-    <div className="feed-item">
+    <div className="feed-item clickable" onClick={handleClick}>
       <div className="feed-item-content">
         <div className="feed-item-image">
           {item.image ? (

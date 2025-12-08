@@ -4,6 +4,9 @@
   border-radius: 8px;
   background: white;
   transition: all 0.2s ease;
+}
+
+.feed-item.clickable {
   cursor: pointer;
 }
 
