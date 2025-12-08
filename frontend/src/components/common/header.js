@@ -7,13 +7,18 @@ function Header({ user, onLogout, onMenuToggle }) {
 
   const menuItems = [
     {
+      label: "Feed",
+      icon: "🍯",
+      onClick: () => navigate("/"),
+    },
+    {
       label: "Create Offer",
-      icon: "📋",
+      icon: "➕",
       onClick: () => navigate("/create-offer"),
     },
     {
       label: "Create Need",
-      icon: "📝",
+      icon: "➕",
       onClick: () => navigate("/create-need"),
     },
     // {
@@ -21,13 +26,13 @@ function Header({ user, onLogout, onMenuToggle }) {
     //   icon: "📍",
     //   onClick: () => navigate("/in-your-area"),
     // },
-    { label: "People", icon: "👥", onClick: () => navigate("/people") },
+    //{ label: "People", icon: "👥", onClick: () => navigate("/people") },
     {
       label: "Messages",
       icon: "💬",
       onClick: () => navigate("/messages"),
     },
-    { label: "Settings", icon: "⚙️", onClick: () => navigate("/settings") },
+    //{ label: "Settings", icon: "⚙️", onClick: () => navigate("/settings") },
   ];
 
   const handleProfileClick = () => {
@@ -43,19 +48,10 @@ function Header({ user, onLogout, onMenuToggle }) {
     <header className="home-header">
       <nav className="home-nav">
         <div className="nav-left">
-          <button
-            className="hamburger-menu"
-            onClick={onMenuToggle}
-            aria-label="Menu"
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-          <div className="logo">
+          <button className="logo" onClick={() => navigate("/")}>
             <span className="bee-icon">🐝</span>
             <span className="logo-text">THE HIVE</span>
-          </div>
+          </button>
         </div>
         {user && (
           <div className="nav-center">
