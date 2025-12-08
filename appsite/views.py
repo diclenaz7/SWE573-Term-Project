@@ -9,6 +9,8 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 from core.models import Offer, Need, Tag
 from django.conf import settings
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.uploadhandler import MemoryFileUploadHandler
 import json
 import secrets
 
@@ -393,6 +395,295 @@ def api_offers(request):
 
 
 @csrf_exempt
+@require_http_methods(["GET", "PUT", "PATCH", "OPTIONS"])
+def api_offer_detail(request, offer_id):
+    """API endpoint for retrieving (GET) and updating (PUT/PATCH) a single offer by ID."""
+    # Handle OPTIONS preflight request for CORS
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "GET, PUT, PATCH, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    # Authenticate user for PUT/PATCH requests
+    authenticated_user = None
+    if request.method in ["PUT", "PATCH"]:
+        # Try token-based authentication first (for Safari)
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            authenticated_user = get_user_from_token(token)
+        
+        # Fall back to session-based authentication (for Chrome)
+        if not authenticated_user and request.user.is_authenticated:
+            authenticated_user = request.user
+        
+        if not authenticated_user:
+            response = JsonResponse(
+                {"detail": "Authentication required", "message": "Authentication required"},
+                status=401,
+            )
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    # Handle GET request
+    if request.method == "GET":
+        try:
+            # Get the offer by ID
+            offer = Offer.objects.select_related('user').prefetch_related('tags').get(id=offer_id)
+            
+            # Build image URL if image exists
+            image_url = None
+            if offer.image:
+                image_url = request.build_absolute_uri(offer.image.url)
+            
+            # Serialize tags
+            tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
+            
+            offer_data = {
+                'id': offer.id,
+                'user': {
+                    'id': offer.user.id,
+                    'username': offer.user.username,
+                    'email': offer.user.email or '',
+                },
+                'title': offer.title,
+                'description': offer.description,
+                'location': offer.location or '',
+                'latitude': str(offer.latitude) if offer.latitude else None,
+                'longitude': str(offer.longitude) if offer.longitude else None,
+                'status': offer.status,
+                'tags': tags_data,
+                'is_reciprocal': offer.is_reciprocal,
+                'contact_preference': offer.contact_preference,
+                'created_at': offer.created_at.isoformat(),
+                'updated_at': offer.updated_at.isoformat(),
+                'expires_at': offer.expires_at.isoformat() if offer.expires_at else None,
+                'image': image_url,
+                'frequency': offer.frequency or '',
+                'duration': offer.duration or '',
+                'min_people': offer.min_people,
+                'max_people': offer.max_people,
+            }
+            
+            response = JsonResponse(offer_data, status=200)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+            
+        except Offer.DoesNotExist:
+            return JsonResponse({
+                'message': 'Offer not found'
+            }, status=404)
+        except Exception as e:
+            return JsonResponse({
+                'message': f'Failed to retrieve offer: {str(e)}'
+            }, status=500)
+    
+    # Handle PUT/PATCH request - update offer
+    if request.method in ["PUT", "PATCH"]:
+        try:
+            # Get the offer by ID
+            offer = Offer.objects.select_related('user').prefetch_related('tags').get(id=offer_id)
+            
+            # Check if user is the owner
+            if offer.user.id != authenticated_user.id:
+                response = JsonResponse({
+                    'message': 'You do not have permission to edit this offer'
+                }, status=403)
+                response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                response["Access-Control-Allow-Credentials"] = "true"
+                return response
+            
+            # Get form data from PUT/PATCH (FormData) or JSON body
+            content_type = request.content_type or request.META.get('CONTENT_TYPE', '')
+            
+            title = None
+            description = None
+            location = None
+            image = None
+            tag_names = []
+            frequency = None
+            duration = None
+            min_people = None
+            max_people = None
+            
+            if 'multipart/form-data' in content_type:
+                # Try to get from request.POST and request.FILES
+                if hasattr(request, 'POST') and request.POST:
+                    title = request.POST.get('title', None)
+                    description = request.POST.get('description', None)
+                    location = request.POST.get('location', None)
+                    tag_names = request.POST.getlist('tags') or []
+                    frequency = request.POST.get('frequency', None)
+                    duration = request.POST.get('duration', None)
+                    # Accept both minPeople/min_people and maxPeople/max_people
+                    min_people_str = request.POST.get('minPeople') or request.POST.get('min_people', None)
+                    max_people_str = request.POST.get('maxPeople') or request.POST.get('max_people', None)
+                    
+                    if min_people_str:
+                        try:
+                            min_people = int(min_people_str)
+                        except ValueError:
+                            min_people = None
+                    if max_people_str:
+                        try:
+                            max_people = int(max_people_str)
+                        except ValueError:
+                            max_people = None
+                
+                if hasattr(request, 'FILES') and request.FILES:
+                    image = request.FILES.get('image', None)
+            else:
+                # Handle JSON (preferred method, used when no image is being uploaded)
+                try:
+                    body = json.loads(request.body)
+                    title = body.get('title', None)
+                    description = body.get('description', None)
+                    location = body.get('location', None)
+                    
+                    # Get tags (can be multiple)
+                    tag_names = body.get('tags', [])
+                    if not isinstance(tag_names, list):
+                        tag_names = [tag_names] if tag_names else []
+                    image = None
+                    frequency = body.get('frequency', None)
+                    duration = body.get('duration', None)
+                    # Accept both minPeople/min_people and maxPeople/max_people
+                    min_people = body.get('minPeople') or body.get('min_people', None)
+                    max_people = body.get('maxPeople') or body.get('max_people', None)
+                    if min_people is not None:
+                        try:
+                            min_people = int(min_people)
+                        except (ValueError, TypeError):
+                            min_people = None
+                    if max_people is not None:
+                        try:
+                            max_people = int(max_people)
+                        except (ValueError, TypeError):
+                            max_people = None
+                except (json.JSONDecodeError, ValueError) as json_error:
+                    response = JsonResponse({
+                        'message': f'Invalid request body format: {str(json_error)}'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+            
+            # Update fields if provided
+            if title is not None:
+                if len(title) < 5:
+                    response = JsonResponse({
+                        'errors': {'title': ['Title must be at least 5 characters long.']},
+                        'message': 'Title must be at least 5 characters long.'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+                offer.title = title
+            
+            if description is not None:
+                if len(description) < 20:
+                    response = JsonResponse({
+                        'errors': {'description': ['Description must be at least 20 characters long.']},
+                        'message': 'Description must be at least 20 characters long.'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+                offer.description = description
+            
+            if location is not None:
+                offer.location = location
+            
+            if image is not None:
+                offer.image = image
+            
+            if frequency is not None:
+                offer.frequency = frequency
+            
+            if duration is not None:
+                offer.duration = duration
+            
+            if min_people is not None:
+                offer.min_people = min_people
+            
+            if max_people is not None:
+                offer.max_people = max_people
+            
+            offer.save()
+            
+            # Handle tags - clear existing and add new ones
+            if tag_names is not None:
+                offer.tags.clear()
+                for tag_name in tag_names:
+                    if tag_name.strip():
+                        tag_name_lower = tag_name.strip().lower()
+                        tag, created = Tag.objects.get_or_create(
+                            name=tag_name_lower,
+                            defaults={'slug': slugify(tag_name_lower)}
+                        )
+                        offer.tags.add(tag)
+            
+            # Build image URL if image exists
+            image_url = None
+            if offer.image:
+                image_url = request.build_absolute_uri(offer.image.url)
+            
+            # Serialize tags
+            tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
+            
+            offer_data = {
+                'id': offer.id,
+                'user': {
+                    'id': offer.user.id,
+                    'username': offer.user.username,
+                    'email': offer.user.email or '',
+                },
+                'title': offer.title,
+                'description': offer.description,
+                'location': offer.location or '',
+                'latitude': str(offer.latitude) if offer.latitude else None,
+                'longitude': str(offer.longitude) if offer.longitude else None,
+                'status': offer.status,
+                'tags': tags_data,
+                'is_reciprocal': offer.is_reciprocal,
+                'contact_preference': offer.contact_preference,
+                'created_at': offer.created_at.isoformat(),
+                'updated_at': offer.updated_at.isoformat(),
+                'expires_at': offer.expires_at.isoformat() if offer.expires_at else None,
+                'image': image_url,
+                'frequency': offer.frequency or '',
+                'duration': offer.duration or '',
+                'min_people': offer.min_people,
+                'max_people': offer.max_people,
+            }
+            
+            response = JsonResponse(offer_data, status=200)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+            
+        except Offer.DoesNotExist:
+            response = JsonResponse({
+                'message': 'Offer not found'
+            }, status=404)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as e:
+            response = JsonResponse({
+                'message': f'Failed to update offer: {str(e)}'
+            }, status=500)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+
+@csrf_exempt
 @require_http_methods(["GET", "POST", "OPTIONS"])
 def api_needs(request):
     """API endpoint for retrieving (GET) and creating (POST) needs."""
@@ -565,4 +856,245 @@ def api_needs(request):
         return JsonResponse({
             'message': f'Failed to create need: {str(e)}'
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "PUT", "PATCH", "OPTIONS"])
+def api_need_detail(request, need_id):
+    """API endpoint for retrieving (GET) and updating (PUT/PATCH) a single need by ID."""
+    # Handle OPTIONS preflight request for CORS
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "GET, PUT, PATCH, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    # Authenticate user for PUT/PATCH requests
+    authenticated_user = None
+    if request.method in ["PUT", "PATCH"]:
+        # Try token-based authentication first (for Safari)
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            authenticated_user = get_user_from_token(token)
+        
+        # Fall back to session-based authentication (for Chrome)
+        if not authenticated_user and request.user.is_authenticated:
+            authenticated_user = request.user
+        
+        if not authenticated_user:
+            response = JsonResponse(
+                {"detail": "Authentication required", "message": "Authentication required"},
+                status=401,
+            )
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    # Handle GET request
+    if request.method == "GET":
+        try:
+            # Get the need by ID
+            need = Need.objects.select_related('user').prefetch_related('tags').get(id=need_id)
+            
+            # Build image URL if image exists
+            image_url = None
+            if need.image:
+                image_url = request.build_absolute_uri(need.image.url)
+            
+            # Serialize tags
+            tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
+            
+            need_data = {
+                'id': need.id,
+                'user': {
+                    'id': need.user.id,
+                    'username': need.user.username,
+                    'email': need.user.email or '',
+                },
+                'title': need.title,
+                'description': need.description,
+                'location': need.location or '',
+                'latitude': str(need.latitude) if need.latitude else None,
+                'longitude': str(need.longitude) if need.longitude else None,
+                'status': need.status,
+                'tags': tags_data,
+                'contact_preference': need.contact_preference,
+                'created_at': need.created_at.isoformat(),
+                'updated_at': need.updated_at.isoformat(),
+                'expires_at': need.expires_at.isoformat() if need.expires_at else None,
+                'image': image_url,
+            }
+            
+            response = JsonResponse(need_data, status=200)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+            
+        except Need.DoesNotExist:
+            return JsonResponse({
+                'message': 'Need not found'
+            }, status=404)
+        except Exception as e:
+            return JsonResponse({
+                'message': f'Failed to retrieve need: {str(e)}'
+            }, status=500)
+    
+    # Handle PUT/PATCH request - update need
+    if request.method in ["PUT", "PATCH"]:
+        try:
+            # Get the need by ID
+            need = Need.objects.select_related('user').prefetch_related('tags').get(id=need_id)
+            
+            # Check if user is the owner
+            if need.user.id != authenticated_user.id:
+                response = JsonResponse({
+                    'message': 'You do not have permission to edit this need'
+                }, status=403)
+                response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                response["Access-Control-Allow-Credentials"] = "true"
+                return response
+            
+            # Get form data from PUT/PATCH (FormData) or JSON body
+            # Frontend now sends JSON for updates without images, FormData only when image is included
+            content_type = request.content_type or request.META.get('CONTENT_TYPE', '')
+            
+            title = None
+            description = None
+            location = None
+            image = None
+            tag_names = []
+            
+            if 'multipart/form-data' in content_type:
+                # Try to get from request.POST and request.FILES
+                # Note: For PUT requests, Django may not populate these automatically
+                # This may require middleware or manual parsing
+                if hasattr(request, 'POST') and request.POST:
+                    title = request.POST.get('title', None)
+                    description = request.POST.get('description', None)
+                    location = request.POST.get('location', None)
+                    tag_names = request.POST.getlist('tags') or []
+                
+                if hasattr(request, 'FILES') and request.FILES:
+                    image = request.FILES.get('image', None)
+            else:
+                # Handle JSON (preferred method, used when no image is being uploaded)
+                try:
+                    body = json.loads(request.body)
+                    title = body.get('title', None)
+                    description = body.get('description', None)
+                    location = body.get('location', None)
+                    
+                    # Get tags (can be multiple)
+                    tag_names = body.get('tags', [])
+                    if not isinstance(tag_names, list):
+                        tag_names = [tag_names] if tag_names else []
+                    image = None
+                except (json.JSONDecodeError, ValueError) as json_error:
+                    # If JSON parsing fails, return error
+                    response = JsonResponse({
+                        'message': f'Invalid request body format: {str(json_error)}'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+            
+            # Debug logging (remove in production)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"PUT request - title: {title}, description: {description}, location: {location}, tags: {tag_names}, has_image: {image is not None}")
+            
+            # Update fields if provided
+            if title is not None:
+                if len(title) < 5:
+                    response = JsonResponse({
+                        'errors': {'title': ['Title must be at least 5 characters long.']},
+                        'message': 'Title must be at least 5 characters long.'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+                need.title = title
+            
+            if description is not None:
+                if len(description) < 20:
+                    response = JsonResponse({
+                        'errors': {'description': ['Description must be at least 20 characters long.']},
+                        'message': 'Description must be at least 20 characters long.'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+                need.description = description
+            
+            if location is not None:
+                need.location = location
+            
+            if image is not None:
+                need.image = image
+            
+            need.save()
+            
+            # Handle tags - clear existing and add new ones
+            if tag_names is not None:
+                need.tags.clear()
+                for tag_name in tag_names:
+                    if tag_name.strip():
+                        tag_name_lower = tag_name.strip().lower()
+                        tag, created = Tag.objects.get_or_create(
+                            name=tag_name_lower,
+                            defaults={'slug': slugify(tag_name_lower)}
+                        )
+                        need.tags.add(tag)
+            
+            # Build image URL if image exists
+            image_url = None
+            if need.image:
+                image_url = request.build_absolute_uri(need.image.url)
+            
+            # Serialize tags
+            tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
+            
+            need_data = {
+                'id': need.id,
+                'user': {
+                    'id': need.user.id,
+                    'username': need.user.username,
+                    'email': need.user.email or '',
+                },
+                'title': need.title,
+                'description': need.description,
+                'location': need.location or '',
+                'latitude': str(need.latitude) if need.latitude else None,
+                'longitude': str(need.longitude) if need.longitude else None,
+                'status': need.status,
+                'tags': tags_data,
+                'contact_preference': need.contact_preference,
+                'created_at': need.created_at.isoformat(),
+                'updated_at': need.updated_at.isoformat(),
+                'expires_at': need.expires_at.isoformat() if need.expires_at else None,
+                'image': image_url,
+            }
+            
+            response = JsonResponse(need_data, status=200)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+            
+        except Need.DoesNotExist:
+            response = JsonResponse({
+                'message': 'Need not found'
+            }, status=404)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as e:
+            response = JsonResponse({
+                'message': f'Failed to update need: {str(e)}'
+            }, status=500)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
 

@@ -28,7 +28,9 @@ urlpatterns = [
     path('api/auth/user/', views.api_user, name='api_user'),
     path('api/hello/', views.hello_api, name='hello_api'),
     path('api/offers/', views.api_offers, name='api_offers'),  # GET for listing, POST for creating
+    path('api/offers/<int:offer_id>/', views.api_offer_detail, name='api_offer_detail'),  # GET for single offer, PUT/PATCH for updating
     path('api/needs/', views.api_needs, name='api_needs'),  # GET for listing, POST for creating
+    path('api/needs/<int:need_id>/', views.api_need_detail, name='api_need_detail'),  # GET for single need, PUT/PATCH for updating
 ]
 
 # Serve media files in development
