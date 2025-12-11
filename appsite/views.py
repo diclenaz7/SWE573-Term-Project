@@ -794,6 +794,7 @@ def api_needs(request):
             title = body.get('title', '')
             description = body.get('description', '')
             location = body.get('location', '')
+            image = None  # Can't send files via JSON
             
             # Get tags (can be multiple)
             tag_names = body.get('tags', [])
