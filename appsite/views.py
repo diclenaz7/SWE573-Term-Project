@@ -7,7 +7,8 @@ from django.views.decorators.http import require_http_methods
 from django.core.cache import cache
 from django.contrib.auth.models import User
 from django.utils.text import slugify
-from core.models import Offer, Need, Tag
+from django.db.models import Q
+from core.models import Offer, Need, Tag, UserProfile
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.uploadhandler import MemoryFileUploadHandler
@@ -158,6 +159,344 @@ def api_user(request):
         "username": user.username,
         "email": user.email or "",
     })
+
+
+@csrf_exempt
+@require_http_methods(["GET", "PATCH", "PUT", "OPTIONS"])
+def api_profile(request, user_id=None):
+    """API endpoint for retrieving (GET) and updating (PATCH/PUT) user profile.
+    If user_id is provided, returns that user's profile. Otherwise returns current user's profile.
+    """
+    # Handle OPTIONS preflight request for CORS
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "GET, PATCH, PUT, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    # Authenticate user (needed for viewing any profile)
+    authenticated_user = None
+    # Try token-based authentication first (for Safari)
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        authenticated_user = get_user_from_token(token)
+    
+    # Fall back to session-based authentication (for Chrome)
+    if not authenticated_user and request.user.is_authenticated:
+        authenticated_user = request.user
+    
+    if not authenticated_user:
+        response = JsonResponse(
+            {"detail": "Authentication required", "message": "Authentication required"},
+            status=401,
+        )
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    # Determine which user's profile to show
+    if user_id:
+        try:
+            profile_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            response = JsonResponse(
+                {"detail": "User not found", "message": "User not found"},
+                status=404,
+            )
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+    else:
+        profile_user = authenticated_user
+    
+    # Get or create user profile
+    profile, created = UserProfile.objects.get_or_create(user=profile_user)
+    
+    # Check if viewing own profile (for edit permissions)
+    is_own_profile = (profile_user.id == authenticated_user.id)
+    
+    # Handle GET request
+    if request.method == "GET":
+        try:
+            # Build profile image URL if exists
+            profile_image_url = None
+            if profile.profile_image:
+                profile_image_url = request.build_absolute_uri(profile.profile_image.url)
+            
+            # Get user's offers and needs with full data
+            offers = Offer.objects.filter(user=profile_user).select_related('user').prefetch_related('tags').order_by('-created_at')
+            needs = Need.objects.filter(user=profile_user).select_related('user').prefetch_related('tags').order_by('-created_at')
+            
+            offers_data = []
+            for offer in offers:
+                # Build image URL if image exists
+                image_url = None
+                if offer.image:
+                    image_url = request.build_absolute_uri(offer.image.url)
+                
+                # Serialize tags
+                tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
+                
+                offers_data.append({
+                    'id': offer.id,
+                    'title': offer.title,
+                    'description': offer.description,
+                    'status': offer.status,
+                    'image': image_url,
+                    'location': offer.location or '',
+                    'created_at': offer.created_at.isoformat(),
+                    'user': {
+                        'id': offer.user.id,
+                        'username': offer.user.username,
+                        'email': offer.user.email or '',
+                    },
+                    'tags': tags_data,
+                })
+            
+            needs_data = []
+            for need in needs:
+                # Build image URL if image exists
+                image_url = None
+                if need.image:
+                    image_url = request.build_absolute_uri(need.image.url)
+                
+                # Serialize tags
+                tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
+                
+                needs_data.append({
+                    'id': need.id,
+                    'title': need.title,
+                    'description': need.description,
+                    'status': need.status,
+                    'image': image_url,
+                    'location': need.location or '',
+                    'created_at': need.created_at.isoformat(),
+                    'user': {
+                        'id': need.user.id,
+                        'username': need.user.username,
+                        'email': need.user.email or '',
+                    },
+                    'tags': tags_data,
+                })
+            
+            # Get full name from user model
+            full_name = f"{profile_user.first_name} {profile_user.last_name}".strip()
+            if not full_name:
+                full_name = profile_user.username
+            
+            profile_data = {
+                'id': profile.id,
+                'is_own_profile': is_own_profile,
+                'user': {
+                    'id': profile_user.id,
+                    'username': profile_user.username,
+                    'email': profile_user.email or '',
+                    'first_name': profile_user.first_name,
+                    'last_name': profile_user.last_name,
+                    'full_name': full_name,
+                },
+                'bio': profile.bio or '',
+                'location': profile.location or '',
+                'phone': profile.phone or '',
+                'profile_image': profile_image_url,
+                'reputation_score': float(profile.reputation_score),
+                'rank': profile.rank,
+                'rank_display': profile.get_rank_display(),
+                'created_at': profile.created_at.isoformat(),
+                'updated_at': profile.updated_at.isoformat(),
+                'offers': offers_data,
+                'needs': needs_data,
+            }
+            
+            response = JsonResponse(profile_data, status=200)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+            
+        except Exception as e:
+            response = JsonResponse({
+                'message': f'Failed to retrieve profile: {str(e)}'
+            }, status=500)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    # Handle PATCH/PUT request - update profile (only allowed for own profile)
+    if not is_own_profile:
+        response = JsonResponse(
+            {"detail": "Permission denied", "message": "You can only edit your own profile"},
+            status=403,
+        )
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    try:
+        # Check if request has files or is multipart (FormData)
+        if request.FILES or (request.content_type and 'multipart/form-data' in request.content_type):
+            # Handle FormData (for file uploads)
+            bio = request.POST.get('bio', '')
+            profile_image = request.FILES.get('profile_image', None)
+        else:
+            # Handle JSON
+            body = json.loads(request.body)
+            bio = body.get('bio', '')
+            profile_image = None  # Can't send files via JSON
+        
+        # Update bio if provided
+        if bio is not None:
+            profile.bio = bio
+        
+        # Update profile image if provided
+        if profile_image is not None:
+            profile.profile_image = profile_image
+        
+        profile.save()
+        
+        # Build updated profile image URL
+        profile_image_url = None
+        if profile.profile_image:
+            profile_image_url = request.build_absolute_uri(profile.profile_image.url)
+        
+        # Get full name from user model
+        full_name = f"{profile_user.first_name} {profile_user.last_name}".strip()
+        if not full_name:
+            full_name = profile_user.username
+        
+        profile_data = {
+            'id': profile.id,
+            'is_own_profile': True,
+            'user': {
+                'id': profile_user.id,
+                'username': profile_user.username,
+                'email': profile_user.email or '',
+                'first_name': profile_user.first_name,
+                'last_name': profile_user.last_name,
+                'full_name': full_name,
+            },
+            'bio': profile.bio or '',
+            'location': profile.location or '',
+            'phone': profile.phone or '',
+            'profile_image': profile_image_url,
+            'reputation_score': float(profile.reputation_score),
+            'rank': profile.rank,
+            'rank_display': profile.get_rank_display(),
+            'created_at': profile.created_at.isoformat(),
+            'updated_at': profile.updated_at.isoformat(),
+        }
+        
+        response = JsonResponse(profile_data, status=200)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
+    except json.JSONDecodeError:
+        response = JsonResponse({
+            'message': 'Invalid JSON data'
+        }, status=400)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    except Exception as e:
+        response = JsonResponse({
+            'message': f'Failed to update profile: {str(e)}'
+        }, status=500)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+def api_people(request):
+    """API endpoint for retrieving all users (people) with optional search."""
+    # Handle OPTIONS preflight request for CORS
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    try:
+        # Get search query parameter
+        search_query = request.GET.get('search', '').strip()
+        
+        # Get all users with their profiles
+        users = User.objects.select_related('profile').all()
+        
+        # Filter by search query if provided
+        if search_query:
+            users = users.filter(
+                Q(username__icontains=search_query) |
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query) |
+                Q(email__icontains=search_query) |
+                Q(profile__bio__icontains=search_query)
+            )
+        
+        # Order by username
+        users = users.order_by('username')
+        
+        # Serialize users
+        people_data = []
+        for user in users:
+            # Get or create profile
+            profile, created = UserProfile.objects.get_or_create(user=user)
+            
+            # Build profile image URL if exists
+            profile_image_url = None
+            if profile.profile_image:
+                profile_image_url = request.build_absolute_uri(profile.profile_image.url)
+            
+            # Get full name
+            full_name = f"{user.first_name} {user.last_name}".strip()
+            if not full_name:
+                full_name = user.username
+            
+            # Get user's offer and need counts
+            offer_count = Offer.objects.filter(user=user).count()
+            need_count = Need.objects.filter(user=user).count()
+            
+            people_data.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email or '',
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'full_name': full_name,
+                'profile': {
+                    'bio': profile.bio or '',
+                    'location': profile.location or '',
+                    'profile_image': profile_image_url,
+                    'reputation_score': float(profile.reputation_score),
+                    'rank': profile.rank,
+                    'rank_display': profile.get_rank_display(),
+                },
+                'offer_count': offer_count,
+                'need_count': need_count,
+            })
+        
+        response = JsonResponse({
+            'people': people_data,
+            'count': len(people_data),
+            'search': search_query,
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
+    except Exception as e:
+        response = JsonResponse({
+            'message': f'Failed to retrieve people: {str(e)}'
+        }, status=500)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
 
 
 def hello_api(request):

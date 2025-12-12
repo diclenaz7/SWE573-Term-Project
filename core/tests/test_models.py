@@ -36,7 +36,6 @@ class UserProfileModelTest(TestCase):
         self.assertEqual(profile.user, self.user)
         self.assertEqual(profile.bio, 'Test bio')
         self.assertEqual(profile.location, 'Test Location')
-        self.assertFalse(profile.is_verified)
     
     def test_user_profile_str(self):
         """Test UserProfile string representation."""

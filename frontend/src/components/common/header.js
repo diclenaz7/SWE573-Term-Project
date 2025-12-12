@@ -28,6 +28,11 @@ function Header({ user, onLogout, onMenuToggle }) {
     // },
     //{ label: "People", icon: "👥", onClick: () => navigate("/people") },
     {
+      label: "People",
+      icon: "👥",
+      onClick: () => navigate("/people"),
+    },
+    {
       label: "Messages",
       icon: "💬",
       onClick: () => navigate("/messages"),
@@ -37,8 +42,7 @@ function Header({ user, onLogout, onMenuToggle }) {
 
   const handleProfileClick = () => {
     if (user) {
-      // TODO: Navigate to profile page when implemented
-      console.log("Navigate to profile");
+      navigate("/profile");
     } else {
       navigate("/register");
     }
