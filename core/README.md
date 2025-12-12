@@ -25,7 +25,6 @@ Extends Django's built-in `User` model with community-specific information.
 - `location` (CharField): General location description
 - `latitude` / `longitude` (DecimalField): Coordinates for map display
 - `phone` (CharField): Contact phone number
-- `is_verified` (Boolean): Community verification status
 - `created_at` / `updated_at` (DateTimeField): Timestamps
 
 **Usage:**
@@ -490,7 +489,7 @@ gardening_offers = Offer.objects.filter(
 ).distinct()
 ```
 
-```
+````
 
 ### Get Pending Interests for User's Offers
 
@@ -500,7 +499,7 @@ pending_interests = OfferInterest.objects.filter(
     offer__in=my_offers,
     status='pending'
 )
-```
+````
 
 ### Get User's Active Handshakes
 

@@ -129,7 +129,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.7749'),
                     'longitude': Decimal('-122.4194'),
                     'phone': '415-555-0101',
-                    'is_verified': True,
+                    'reputation_score': Decimal('9.5'),
+                    'rank': 'queen',
                 }
             },
             {
@@ -144,7 +145,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.8044'),
                     'longitude': Decimal('-122.2712'),
                     'phone': '510-555-0102',
-                    'is_verified': True,
+                    'reputation_score': Decimal('8.8'),
+                    'rank': 'queen',
                 }
             },
             {
@@ -159,7 +161,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.8715'),
                     'longitude': Decimal('-122.2730'),
                     'phone': '510-555-0103',
-                    'is_verified': False,
+                    'reputation_score': Decimal('7.2'),
+                    'rank': 'worker',
                 }
             },
             {
@@ -174,7 +177,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.7849'),
                     'longitude': Decimal('-122.4094'),
                     'phone': '415-555-0104',
-                    'is_verified': True,
+                    'reputation_score': Decimal('8.3'),
+                    'rank': 'worker',
                 }
             },
             {
@@ -189,7 +193,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.7749'),
                     'longitude': Decimal('-122.4194'),
                     'phone': '415-555-0105',
-                    'is_verified': False,
+                    'reputation_score': Decimal('3.5'),
+                    'rank': 'newbee',
                 }
             },
             {
@@ -204,7 +209,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.8044'),
                     'longitude': Decimal('-122.2712'),
                     'phone': '510-555-0106',
-                    'is_verified': True,
+                    'reputation_score': Decimal('9.8'),
+                    'rank': 'queen',
                 }
             },
             {
@@ -219,7 +225,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.8715'),
                     'longitude': Decimal('-122.2730'),
                     'phone': '510-555-0107',
-                    'is_verified': False,
+                    'reputation_score': Decimal('5.1'),
+                    'rank': 'newbee',
                 }
             },
             {
@@ -234,7 +241,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.7849'),
                     'longitude': Decimal('-122.4094'),
                     'phone': '415-555-0108',
-                    'is_verified': False,
+                    'reputation_score': Decimal('6.7'),
+                    'rank': 'worker',
                 }
             },
             {
@@ -249,7 +257,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.7749'),
                     'longitude': Decimal('-122.4194'),
                     'phone': '415-555-0109',
-                    'is_verified': True,
+                    'reputation_score': Decimal('8.9'),
+                    'rank': 'worker',
                 }
             },
             {
@@ -264,7 +273,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.8715'),
                     'longitude': Decimal('-122.2730'),
                     'phone': '510-555-0110',
-                    'is_verified': True,
+                    'reputation_score': Decimal('9.2'),
+                    'rank': 'queen',
                 }
             },
             {
@@ -279,7 +289,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.8044'),
                     'longitude': Decimal('-122.2712'),
                     'phone': '510-555-0111',
-                    'is_verified': True,
+                    'reputation_score': Decimal('7.8'),
+                    'rank': 'worker',
                 }
             },
             {
@@ -294,7 +305,8 @@ class Command(BaseCommand):
                     'latitude': Decimal('37.7849'),
                     'longitude': Decimal('-122.4094'),
                     'phone': '415-555-0112',
-                    'is_verified': False,
+                    'reputation_score': Decimal('4.2'),
+                    'rank': 'newbee',
                 }
             },
         ]
@@ -423,6 +435,7 @@ class Command(BaseCommand):
                 'is_reciprocal': True,
                 'contact_preference': 'any',
                 'expires_at': now + timedelta(days=28),
+                "image": "https://media.gettyimages.com/id/1477422276/photo/male-chef-plating-food-in-plate-while-working-in-commercial-kitchen.jpg?s=1024x1024&w=gi&k=20&c=pRrN47XnI0v1HDEjrkdwGjfD7mhmNSVTBKKanKeaCLw="
             },
             {
                 'user': 'driver_alex',
@@ -436,6 +449,7 @@ class Command(BaseCommand):
                 'is_reciprocal': False,
                 'contact_preference': 'phone',
                 'expires_at': now + timedelta(days=22),
+                "image": "https://media.gettyimages.com/id/1582802930/photo/happy-man-driving-his-car.jpg?s=2048x2048&w=gi&k=20&c=CtNb9STCwUNFmZktd-5DYmbf-GB32G_fcXS-j6j1Gko=",
             },
         ]
         

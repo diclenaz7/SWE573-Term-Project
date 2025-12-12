@@ -9,15 +9,24 @@ class UserProfile(models.Model):
     """
     Extended user profile with additional information for The Hive community.
     """
+    RANK_CHOICES = [
+        ('newbee', 'New Bee'),
+        ('worker', 'Worker Bee'),
+        ('queen', 'Queen Bee'),
+        ('drone', 'Drone'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     bio = models.TextField(max_length=500, blank=True, help_text="Tell us about yourself")
     location = models.CharField(max_length=100, blank=True, help_text="Your general location")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Latitude for map")
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Longitude for map")
     phone = models.CharField(max_length=20, blank=True)
+    profile_image = models.ImageField(upload_to='profiles/', blank=True, null=True, help_text="Profile picture")
+    reputation_score = models.DecimalField(max_digits=5, decimal_places=1, default=0.0, help_text="User reputation score")
+    rank = models.CharField(max_length=20, choices=RANK_CHOICES, default='newbee', help_text="User rank badge")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_verified = models.BooleanField(default=False, help_text="Community verification status")
     
     class Meta:
         ordering = ['-created_at']
