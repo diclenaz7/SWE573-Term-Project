@@ -34,6 +34,8 @@ urlpatterns = [
     path('api/offers/<int:offer_id>/', views.api_offer_detail, name='api_offer_detail'),  # GET for single offer, PUT/PATCH for updating
     path('api/needs/', views.api_needs, name='api_needs'),  # GET for listing, POST for creating
     path('api/needs/<int:need_id>/', views.api_need_detail, name='api_need_detail'),  # GET for single need, PUT/PATCH for updating
+    path('api/conversations/', views.api_conversations, name='api_conversations'),  # GET for listing conversations
+    path('api/conversations/<str:conversation_id>/messages/', views.api_conversation_messages, name='api_conversation_messages'),  # GET for messages in a conversation
 ]
 
 # Serve media files in development

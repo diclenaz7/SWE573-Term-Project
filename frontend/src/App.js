@@ -14,6 +14,7 @@ import NeedDetail from "./screens/NeedDetail";
 import OfferDetail from "./screens/OfferDetail";
 import Profile from "./screens/Profile";
 import People from "./screens/People";
+import Messages from "./screens/Messages";
 import "./App.css";
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/:userId" element={<Profile />} />
           <Route path="/people" element={<People />} />
+          <Route path="/messages" element={<Messages />} />
           {/* <Route path="*" element={<Navigate to="/" replace />} /> */}
         </Routes>
       </div>
