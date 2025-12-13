@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MinLengthValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+import re
 
 
 class UserProfile(models.Model):
@@ -177,6 +178,9 @@ class Need(models.Model):
     # Image upload
     image = models.ImageField(upload_to='needs/', blank=True, null=True, help_text="Image for the need")
     
+    # Need-specific details
+    duration = models.CharField(max_length=50, blank=True, help_text="Duration of the need (e.g., '1 Hour', '2 Hours')")
+    
     class Meta:
         ordering = ['-created_at']
         indexes = [
@@ -324,6 +328,12 @@ class Handshake(models.Model):
     # Additional notes
     notes = models.TextField(blank=True, help_text="Any additional notes about the handshake")
     
+    # Honey tracking
+    honey_amount = models.IntegerField(
+        default=0,
+        help_text="Amount of honey provisioned for this handshake (in hours)"
+    )
+    
     class Meta:
         ordering = ['-created_at']
         indexes = [
@@ -339,9 +349,77 @@ class Handshake(models.Model):
             raise ValidationError("Handshake cannot have both offer_interest and need_interest.")
     
     def save(self, *args, **kwargs):
-        """Run validation before saving."""
+        """Run validation before saving and handle honey transfer on completion."""
+        # Check if status is being changed to 'completed'
+        if self.pk:
+            try:
+                old_handshake = Handshake.objects.get(pk=self.pk)
+                old_status = old_handshake.status
+                new_status = self.status
+                
+                # If transitioning to completed, finalize honey transaction
+                if old_status != 'completed' and new_status == 'completed':
+                    self._finalize_honey_transaction()
+                # If transitioning to cancelled, release provisioned honey
+                elif old_status != 'cancelled' and new_status == 'cancelled':
+                    self._release_provisioned_honey()
+            except Handshake.DoesNotExist:
+                pass
+        
         self.full_clean()
         super().save(*args, **kwargs)
+    
+    def _finalize_honey_transaction(self):
+        """Finalize honey transaction when handshake is completed."""
+        if self.honey_amount <= 0:
+            return  # No honey to transfer
+        
+        spender = self.get_spender()
+        earner = self.get_earner()
+        
+        if not spender or not earner:
+            return  # Invalid handshake
+        
+        # Get or create honey balances
+        spender_balance, _ = HoneyBalance.objects.get_or_create(
+            user=spender,
+            defaults={'total_honey': 0, 'provisioned_honey': 0}
+        )
+        earner_balance, _ = HoneyBalance.objects.get_or_create(
+            user=earner,
+            defaults={'total_honey': 0, 'provisioned_honey': 0}
+        )
+        
+        # Finalize transaction: deduct from spender, add to earner
+        try:
+            spender_balance.finalize_transaction(self.honey_amount)
+            earner_balance.add_honey(self.honey_amount)
+        except ValidationError as e:
+            # Log error but don't prevent handshake completion
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error finalizing honey transaction for handshake {self.id}: {e}")
+    
+    def _release_provisioned_honey(self):
+        """Release provisioned honey when handshake is cancelled."""
+        if self.honey_amount <= 0:
+            return  # No honey to release
+        
+        spender = self.get_spender()
+        if not spender:
+            return  # Invalid handshake
+        
+        # Get honey balance
+        try:
+            spender_balance = HoneyBalance.objects.get(user=spender)
+            spender_balance.release_provision(self.honey_amount)
+        except HoneyBalance.DoesNotExist:
+            pass  # No balance to release from
+        except ValidationError as e:
+            # Log error but don't prevent cancellation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error releasing provisioned honey for handshake {self.id}: {e}")
     
     def __str__(self):
         interest_type = "Offer" if self.offer_interest else "Need"
@@ -365,6 +443,40 @@ class Handshake(models.Model):
             return self.user2
         elif user == self.user2:
             return self.user1
+        return None
+    
+    def get_duration_hours(self):
+        """Get the duration in hours for this handshake."""
+        if self.offer_interest:
+            offer = self.offer_interest.offer
+            return parse_duration_to_hours(offer.duration)
+        elif self.need_interest:
+            need = self.need_interest.need
+            return parse_duration_to_hours(need.duration)
+        return 0
+    
+    def get_spender(self):
+        """
+        Get the user who should spend honey.
+        For offers: acceptor (user2) spends, creator (user1) earns
+        For needs: creator (user1) spends, responder (user2) earns
+        """
+        if self.offer_interest:
+            return self.user2  # Acceptor spends
+        elif self.need_interest:
+            return self.user1  # Creator spends
+        return None
+    
+    def get_earner(self):
+        """
+        Get the user who should earn honey.
+        For offers: creator (user1) earns, acceptor (user2) spends
+        For needs: responder (user2) earns, creator (user1) spends
+        """
+        if self.offer_interest:
+            return self.user1  # Creator earns
+        elif self.need_interest:
+            return self.user2  # Responder earns
         return None
 
 
@@ -415,4 +527,116 @@ class Message(models.Model):
     
     def __str__(self):
         return f"Message from {self.sender.username} to {self.recipient.username}"
+
+
+class HoneyBalance(models.Model):
+    """
+    Tracks honey (hour credit) balance for each user.
+    Honey represents one hour of time.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='honey_balance')
+    total_honey = models.IntegerField(
+        default=0,
+        help_text="Total honey balance (usable + provisioned) in hours"
+    )
+    provisioned_honey = models.IntegerField(
+        default=0,
+        help_text="Honey temporarily reserved in active handshakes (in hours)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f"{self.user.username}'s Honey Balance: {self.usable_honey} usable / {self.total_honey} total"
+    
+    @property
+    def usable_honey(self):
+        """Calculate usable honey (total - provisioned)."""
+        return self.total_honey - self.provisioned_honey
+    
+    def can_afford(self, amount):
+        """Check if user has enough usable honey for a transaction."""
+        return self.usable_honey >= int(amount)
+    
+    def provision(self, amount):
+        """Provision (reserve) honey for a handshake."""
+        amount = int(amount)
+        if not self.can_afford(amount):
+            raise ValidationError(f"Insufficient honey. Available: {self.usable_honey}, Required: {amount}")
+        self.provisioned_honey += amount
+        self.save()
+    
+    def release_provision(self, amount):
+        """Release provisioned honey (e.g., if handshake is cancelled)."""
+        amount = int(amount)
+        if self.provisioned_honey < amount:
+            raise ValidationError(f"Cannot release more than provisioned. Provisioned: {self.provisioned_honey}, Requested: {amount}")
+        self.provisioned_honey -= amount
+        self.save()
+    
+    def add_honey(self, amount):
+        """Add honey to total balance."""
+        amount = int(amount)
+        self.total_honey += amount
+        self.save()
+    
+    def deduct_honey(self, amount):
+        """Deduct honey from total balance."""
+        amount = int(amount)
+        if self.total_honey < amount:
+            raise ValidationError(f"Insufficient total honey. Available: {self.total_honey}, Required: {amount}")
+        self.total_honey -= amount
+        self.save()
+    
+    def finalize_transaction(self, provisioned_amount):
+        """
+        Finalize a transaction: deduct provisioned amount from spender and add to earner.
+        This should be called on the spender's balance.
+        """
+        provisioned_amount = int(provisioned_amount)
+        if self.provisioned_honey < provisioned_amount:
+            raise ValidationError(f"Cannot finalize: provisioned amount mismatch. Provisioned: {self.provisioned_honey}, Requested: {provisioned_amount}")
+        # Deduct from total and release provision
+        self.total_honey -= provisioned_amount
+        self.provisioned_honey -= provisioned_amount
+        self.save()
+
+
+def parse_duration_to_hours(duration_str):
+    """
+    Parse duration string to hours (integer, rounded to nearest hour).
+    Examples: "1 Hour" -> 1, "2 Hours" -> 2, "1.5 Hours" -> 2, "30 Minutes" -> 1
+    """
+    if not duration_str:
+        return 0
+    
+    duration_str = duration_str.strip()
+    
+    # Try to extract number from string
+    # Match patterns like "1 Hour", "2 Hours", "1.5 Hours", "30 Minutes", etc.
+    hour_pattern = r'(\d+\.?\d*)\s*(?:hour|hours|hr|hrs)'
+    minute_pattern = r'(\d+\.?\d*)\s*(?:minute|minutes|min|mins)'
+    
+    hours_match = re.search(hour_pattern, duration_str, re.IGNORECASE)
+    if hours_match:
+        hours = float(hours_match.group(1))
+        return round(hours)  # Round to nearest integer
+    
+    minutes_match = re.search(minute_pattern, duration_str, re.IGNORECASE)
+    if minutes_match:
+        minutes = float(minutes_match.group(1))
+        hours = minutes / 60.0  # Convert minutes to hours
+        return round(hours)  # Round to nearest integer hour
+    
+    # If no pattern matches, try to extract just the number
+    number_match = re.search(r'(\d+\.?\d*)', duration_str)
+    if number_match:
+        # Assume it's hours if no unit specified
+        hours = float(number_match.group(1))
+        return round(hours)  # Round to nearest integer
+    
+    return 0
 

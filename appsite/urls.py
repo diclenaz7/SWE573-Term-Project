@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/needs/<int:need_id>/', views.api_need_detail, name='api_need_detail'),  # GET for single need, PUT/PATCH for updating
     path('api/conversations/', views.api_conversations, name='api_conversations'),  # GET for listing conversations
     path('api/conversations/<str:conversation_id>/messages/', views.api_conversation_messages, name='api_conversation_messages'),  # GET for messages in a conversation
+    path('api/honey/balance/', views.api_honey_balance, name='api_honey_balance'),  # GET for honey balance
 ]
 
 # Serve media files in development

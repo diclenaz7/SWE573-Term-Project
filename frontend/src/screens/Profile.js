@@ -265,6 +265,40 @@ function Profile() {
                 <div className="profile-rank">
                   ★ {getRankDisplay()} {profile.reputation_score}
                 </div>
+                {profile.honey_balance && (
+                  <div className="profile-honey-balance">
+                    <div className="honey-balance-item">
+                      <span className="honey-icon">🍯</span>
+                      <div className="honey-info">
+                        <span className="honey-label">Total Honey</span>
+                        <span className="honey-value">
+                          {profile.honey_balance.total_honey}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="honey-balance-item">
+                      <span className="honey-icon">✨</span>
+                      <div className="honey-info">
+                        <span className="honey-label">Usable Honey</span>
+                        <span className="honey-value usable">
+                          {profile.honey_balance.usable_honey}
+                        </span>
+                      </div>
+                    </div>
+                    {profile.honey_balance.provisioned_honey > 0 && (
+                      <div className="honey-balance-item provisioned">
+                        <span className="honey-icon">🔒</span>
+                        <div className="honey-info">
+                          <span className="honey-label">Provisioned</span>
+                          <span className="honey-value">
+                            {profile.honey_balance.provisioned_honey}
+                          </span>
+                          <span className="honey-unit">hours</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="profile-bio-section">
                   {isEditing && profile.is_own_profile ? (
                     <textarea
