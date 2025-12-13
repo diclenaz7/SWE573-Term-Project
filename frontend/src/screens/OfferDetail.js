@@ -640,6 +640,23 @@ function OfferDetail() {
                 <div className="offer-detail-description">
                   <p>{offer.description}</p>
                 </div>
+                {offer.duration && (
+                  <div className="offer-detail-honey">
+                    <span className="honey-icon-detail">🍯</span>
+                    <div className="honey-info-detail">
+                      <span className="honey-label-detail">Honey Value</span>
+                      <span className="honey-value-detail">
+                        {(() => {
+                          // Parse duration to get hours
+                          const durationStr = offer.duration || "";
+                          const match = durationStr.match(/(\d+)/);
+                          return match ? match[1] : "0";
+                        })()}
+                      </span>
+                      <span className="honey-unit-detail">hour(s)</span>
+                    </div>
+                  </div>
+                )}
                 {offer.tags && offer.tags.length > 0 && (
                   <div className="offer-detail-tags">
                     {offer.tags.map((tag) => (

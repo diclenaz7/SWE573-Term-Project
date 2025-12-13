@@ -703,6 +703,16 @@ def api_offers(request):
         elif len(description) < 20:
             errors['description'] = ['Description must be at least 20 characters long.']
         
+        # Duration is required
+        if not duration:
+            errors['duration'] = ['Duration (hours) is required.']
+        else:
+            # Parse duration to validate it's a valid number
+            from core.models import parse_duration_to_hours
+            hours = parse_duration_to_hours(duration)
+            if hours < 1:
+                errors['duration'] = ['Duration must be at least 1 hour.']
+        
         if errors:
             # Format error message for frontend
             error_messages = []
@@ -1207,6 +1217,16 @@ def api_needs(request):
         elif len(description) < 20:
             errors['description'] = ['Description must be at least 20 characters long.']
         
+        # Duration is required
+        if not duration:
+            errors['duration'] = ['Duration (hours) is required.']
+        else:
+            # Parse duration to validate it's a valid number
+            from core.models import parse_duration_to_hours
+            hours = parse_duration_to_hours(duration)
+            if hours < 1:
+                errors['duration'] = ['Duration must be at least 1 hour.']
+        
         if errors:
             # Format error message for frontend
             error_messages = []
@@ -1224,7 +1244,7 @@ def api_needs(request):
             description=description,
             location=location,
             image=image,  # Django ImageField handles None automatically
-            duration=duration if duration else '',
+            duration=duration,
         )
 
         # Handle tags - create or get existing tags

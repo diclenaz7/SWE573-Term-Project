@@ -150,12 +150,12 @@ function CreateOffer() {
       if (formData.frequency) {
         formDataToSend.append("frequency", formData.frequency);
       }
-      if (formData.duration) {
-        formDataToSend.append(
-          "duration",
-          `${formData.duration} ${formData.durationUnit}`
-        );
-      }
+      // Duration is required - send as "X Hour" or "X Hours"
+      const hours = parseInt(formData.duration) || 1;
+      formDataToSend.append(
+        "duration",
+        `${hours} ${hours === 1 ? "Hour" : "Hours"}`
+      );
 
       if (formData.minPeople) {
         formDataToSend.append("minPeople", formData.minPeople);
@@ -360,7 +360,7 @@ function CreateOffer() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="duration">Duration:</label>
+                <label htmlFor="duration">Duration (Hours) *:</label>
                 <div className="duration-input-container">
                   <input
                     type="number"
@@ -369,9 +369,12 @@ function CreateOffer() {
                     value={formData.duration}
                     onChange={handleInputChange}
                     min="1"
+                    step="1"
+                    required
                     className="duration-input"
+                    placeholder="1"
                   />
-                  <span className="duration-unit">hour</span>
+                  <span className="duration-unit">hour(s)</span>
                 </div>
               </div>
 
