@@ -226,6 +226,7 @@ function Profile() {
   }
 
   const fullName = profile.user?.full_name || profile.user?.username || "User";
+  const username = profile.user?.username;
 
   return (
     <div className="page-container">
@@ -239,15 +240,27 @@ function Profile() {
                   <h2 className="profile-section-title">
                     {fullName}
                     {profile.is_own_profile && !isEditing && (
-                      <button
-                        className="edit-button"
-                        onClick={handleEdit}
-                        title="Edit profile"
-                      >
-                        🖊️
-                      </button>
+                      <>
+                        <button
+                          className="edit-button"
+                          onClick={handleEdit}
+                          title="Edit profile"
+                        >
+                          🖊️
+                        </button>
+                        <button
+                          className="logout-button"
+                          onClick={handleLogout}
+                          title="Logout"
+                        >
+                          Logout
+                        </button>
+                      </>
                     )}
                   </h2>
+                  {username && (
+                    <div className="profile-username">@{username}</div>
+                  )}
                 </div>
                 <div className="profile-rank">
                   ★ {getRankDisplay()} {profile.reputation_score}

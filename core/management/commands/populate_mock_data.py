@@ -14,7 +14,7 @@ from datetime import timedelta
 from decimal import Decimal
 from core.models import (
     UserProfile, Tag, Offer, Need, 
-    OfferInterest, NeedInterest, Handshake
+    OfferInterest, NeedInterest, Handshake, Message
 )
 
 
@@ -48,6 +48,9 @@ class Command(BaseCommand):
         
         # Create some interests and handshakes
         self.create_interests_and_handshakes(users, offers, needs)
+        
+        # Create some sample messages
+        self.create_sample_messages(users)
         
         self.stdout.write(self.style.SUCCESS('\n✅ Successfully populated database with mock data!'))
         self.stdout.write(f'   - {len(users)} users created')
@@ -619,4 +622,73 @@ class Command(BaseCommand):
                 )
                 if created:
                     self.stdout.write(f'  ✓ Created need interest')
+
+    def create_sample_messages(self, users):
+        """Create sample messages between users"""
+        now = timezone.now()
+        
+        # Create messages between gardening_guru and new_parent
+        user1 = users.get('gardening_guru')
+        user2 = users.get('new_parent')
+        if user1 and user2:
+            messages = [
+                {'sender': user1, 'recipient': user2, 'content': 'Hi! I saw your interest in my gardening offer. I\'d be happy to help!', 'created_at': now - timedelta(hours=5)},
+                {'sender': user2, 'recipient': user1, 'content': 'That would be amazing! When would be a good time?', 'created_at': now - timedelta(hours=4, minutes=30)},
+                {'sender': user1, 'recipient': user2, 'content': 'How about this Saturday morning? I can come by around 9am.', 'created_at': now - timedelta(hours=4)},
+                {'sender': user2, 'recipient': user1, 'content': 'Perfect! That works for me. See you then!', 'created_at': now - timedelta(hours=3, minutes=45)},
+            ]
+            for msg_data in messages:
+                Message.objects.get_or_create(
+                    sender=msg_data['sender'],
+                    recipient=msg_data['recipient'],
+                    content=msg_data['content'],
+                    defaults={
+                        'created_at': msg_data['created_at'],
+                        'is_read': True
+                    }
+                )
+            self.stdout.write(f'  ✓ Created messages between {user1.username} and {user2.username}')
+        
+        # Create messages between tech_helper and student_helper
+        user1 = users.get('tech_helper')
+        user2 = users.get('student_helper')
+        if user1 and user2:
+            messages = [
+                {'sender': user2, 'recipient': user1, 'content': 'Hi! I need help with my computer. It\'s running really slow.', 'created_at': now - timedelta(hours=2)},
+                {'sender': user1, 'recipient': user2, 'content': 'I can help with that! What operating system are you using?', 'created_at': now - timedelta(hours=1, minutes=45)},
+                {'sender': user2, 'recipient': user1, 'content': 'Windows 10. It just started getting slow recently.', 'created_at': now - timedelta(hours=1, minutes=30)},
+                {'sender': user1, 'recipient': user2, 'content': 'OK, I can help you troubleshoot. Can we meet this weekend?', 'created_at': now - timedelta(hours=1)},
+            ]
+            for msg_data in messages:
+                Message.objects.get_or_create(
+                    sender=msg_data['sender'],
+                    recipient=msg_data['recipient'],
+                    content=msg_data['content'],
+                    defaults={
+                        'created_at': msg_data['created_at'],
+                        'is_read': False  # Some unread messages
+                    }
+                )
+            self.stdout.write(f'  ✓ Created messages between {user1.username} and {user2.username}')
+        
+        # Create messages between cooking_mom and elderly_neighbor
+        user1 = users.get('cooking_mom')
+        user2 = users.get('elderly_neighbor')
+        if user1 and user2:
+            messages = [
+                {'sender': user1, 'recipient': user2, 'content': 'Hello! I saw you need help with grocery shopping. I\'d be happy to assist!', 'created_at': now - timedelta(days=1, hours=3)},
+                {'sender': user2, 'recipient': user1, 'content': 'Thank you so much! That would be wonderful.', 'created_at': now - timedelta(days=1, hours=2)},
+                {'sender': user1, 'recipient': user2, 'content': 'Great! When would work best for you?', 'created_at': now - timedelta(days=1, hours=1, minutes=45)},
+            ]
+            for msg_data in messages:
+                Message.objects.get_or_create(
+                    sender=msg_data['sender'],
+                    recipient=msg_data['recipient'],
+                    content=msg_data['content'],
+                    defaults={
+                        'created_at': msg_data['created_at'],
+                        'is_read': True
+                    }
+                )
+            self.stdout.write(f'  ✓ Created messages between {user1.username} and {user2.username}')
 

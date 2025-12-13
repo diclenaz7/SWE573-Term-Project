@@ -127,13 +127,16 @@ function NeedDetail() {
   };
 
   const handleProfileClick = () => {
-    // TODO: Navigate to profile page when implemented
-    console.log("Navigate to profile:", need?.user?.id);
+    if (need?.user?.id) {
+      navigate(`/profile/${need.user.id}`);
+    }
   };
 
   const handleMessage = () => {
-    // TODO: Implement messaging functionality
-    console.log("Message clicked for need:", need?.id);
+    if (need?.id) {
+      // Navigate to messages page with need conversation
+      navigate(`/messages?conversation=need_${need.id}`);
+    }
   };
 
   const handleEdit = () => {

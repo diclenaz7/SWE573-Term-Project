@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.db.models import Q
-from core.models import Offer, Need, Tag, UserProfile
+from core.models import Offer, Need, Tag, UserProfile, Message, OfferInterest, NeedInterest, Handshake
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.uploadhandler import MemoryFileUploadHandler
@@ -156,8 +156,12 @@ def api_user(request):
         )
 
     return JsonResponse({
+        "id": user.id,
         "username": user.username,
         "email": user.email or "",
+        "first_name": user.first_name or "",
+        "last_name": user.last_name or "",
+        "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
     })
 
 
@@ -1438,3 +1442,469 @@ def api_need_detail(request, need_id):
             response["Access-Control-Allow-Credentials"] = "true"
             return response
 
+
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+def api_conversations(request):
+    """API endpoint for retrieving conversations for the current user (offer/need-based)."""
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    # Authenticate user
+    user = None
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        user = get_user_from_token(token)
+    
+    if not user and request.user.is_authenticated:
+        user = request.user
+    
+    if not user:
+        response = JsonResponse({
+            'detail': 'Authentication required',
+            'message': 'Authentication required'
+        }, status=401)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    try:
+        conversations = []
+        
+        # Get conversations from offers where user is creator or interested
+        # Offers where user is creator
+        offers_as_creator = Offer.objects.filter(user=user)
+        for offer in offers_as_creator:
+            # Get all interests for this offer
+            interests = OfferInterest.objects.filter(offer=offer).exclude(user=user)
+            for interest in interests:
+                other_user = interest.user
+                # Get last message for this offer conversation
+                last_message = Message.objects.filter(
+                    offer_interest=interest
+                ).order_by('-created_at').first()
+                
+                # Count unread messages
+                unread_count = Message.objects.filter(
+                    offer_interest=interest,
+                    sender=other_user,
+                    recipient=user,
+                    is_read=False
+                ).count()
+                
+                # Get other user's profile
+                try:
+                    profile = other_user.profile
+                    profile_data = {
+                        'profile_image': profile.profile_image.url if profile.profile_image else None,
+                        'bio': profile.bio or '',
+                        'rank': profile.rank or 'newbee',
+                        'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                    }
+                except UserProfile.DoesNotExist:
+                    profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+                
+                conversations.append({
+                    'id': f"offer_{offer.id}",
+                    'type': 'offer',
+                    'offerId': offer.id,
+                    'offerTitle': offer.title,
+                    'isCreator': True,  # User is the offer creator
+                    'otherUser': {
+                        'id': other_user.id,
+                        'username': other_user.username,
+                        'email': other_user.email or '',
+                        'first_name': other_user.first_name or '',
+                        'last_name': other_user.last_name or '',
+                        'full_name': f"{other_user.first_name} {other_user.last_name}".strip() or other_user.username,
+                        'profile': profile_data
+                    },
+                    'lastMessage': last_message.content if last_message else '',
+                    'lastMessageTime': last_message.created_at.isoformat() if last_message else None,
+                    'unreadCount': unread_count,
+                    'interestStatus': interest.status
+                })
+        
+        # Offers where user is interested
+        offer_interests = OfferInterest.objects.filter(user=user)
+        for interest in offer_interests:
+            offer = interest.offer
+            other_user = offer.user
+            # Get last message
+            last_message = Message.objects.filter(
+                offer_interest=interest
+            ).order_by('-created_at').first()
+            
+            # Count unread messages
+            unread_count = Message.objects.filter(
+                offer_interest=interest,
+                sender=other_user,
+                recipient=user,
+                is_read=False
+            ).count()
+            
+            # Get other user's profile
+            try:
+                profile = other_user.profile
+                profile_data = {
+                    'profile_image': profile.profile_image.url if profile.profile_image else None,
+                    'bio': profile.bio or '',
+                    'rank': profile.rank or 'newbee',
+                    'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                }
+            except UserProfile.DoesNotExist:
+                profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+            
+            conversations.append({
+                'id': f"offer_{offer.id}",
+                'type': 'offer',
+                'offerId': offer.id,
+                'offerTitle': offer.title,
+                'isCreator': False,  # User is interested, not creator
+                'otherUser': {
+                    'id': other_user.id,
+                    'username': other_user.username,
+                    'email': other_user.email or '',
+                    'first_name': other_user.first_name or '',
+                    'last_name': other_user.last_name or '',
+                    'full_name': f"{other_user.first_name} {other_user.last_name}".strip() or other_user.username,
+                    'profile': profile_data
+                },
+                'lastMessage': last_message.content if last_message else '',
+                'lastMessageTime': last_message.created_at.isoformat() if last_message else None,
+                'unreadCount': unread_count,
+                'interestStatus': interest.status
+            })
+        
+        # Get conversations from needs where user is creator or helping
+        # Needs where user is creator
+        needs_as_creator = Need.objects.filter(user=user)
+        for need in needs_as_creator:
+            # Get all interests for this need
+            interests = NeedInterest.objects.filter(need=need).exclude(user=user)
+            for interest in interests:
+                other_user = interest.user
+                # Get last message
+                last_message = Message.objects.filter(
+                    need_interest=interest
+                ).order_by('-created_at').first()
+                
+                # Count unread messages
+                unread_count = Message.objects.filter(
+                    need_interest=interest,
+                    sender=other_user,
+                    recipient=user,
+                    is_read=False
+                ).count()
+                
+                # Get other user's profile
+                try:
+                    profile = other_user.profile
+                    profile_data = {
+                        'profile_image': profile.profile_image.url if profile.profile_image else None,
+                        'bio': profile.bio or '',
+                        'rank': profile.rank or 'newbee',
+                        'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                    }
+                except UserProfile.DoesNotExist:
+                    profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+                
+                conversations.append({
+                    'id': f"need_{need.id}",
+                    'type': 'need',
+                    'needId': need.id,
+                    'needTitle': need.title,
+                    'isCreator': True,  # User is the need creator
+                    'otherUser': {
+                        'id': other_user.id,
+                        'username': other_user.username,
+                        'email': other_user.email or '',
+                        'first_name': other_user.first_name or '',
+                        'last_name': other_user.last_name or '',
+                        'full_name': f"{other_user.first_name} {other_user.last_name}".strip() or other_user.username,
+                        'profile': profile_data
+                    },
+                    'lastMessage': last_message.content if last_message else '',
+                    'lastMessageTime': last_message.created_at.isoformat() if last_message else None,
+                    'unreadCount': unread_count,
+                    'interestStatus': interest.status
+                })
+        
+        # Needs where user is helping
+        need_interests = NeedInterest.objects.filter(user=user)
+        for interest in need_interests:
+            need = interest.need
+            other_user = need.user
+            # Get last message
+            last_message = Message.objects.filter(
+                need_interest=interest
+            ).order_by('-created_at').first()
+            
+            # Count unread messages
+            unread_count = Message.objects.filter(
+                need_interest=interest,
+                sender=other_user,
+                recipient=user,
+                is_read=False
+            ).count()
+            
+            # Get other user's profile
+            try:
+                profile = other_user.profile
+                profile_data = {
+                    'profile_image': profile.profile_image.url if profile.profile_image else None,
+                    'bio': profile.bio or '',
+                    'rank': profile.rank or 'newbee',
+                    'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                }
+            except UserProfile.DoesNotExist:
+                profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+            
+            conversations.append({
+                'id': f"need_{need.id}",
+                'type': 'need',
+                'needId': need.id,
+                'needTitle': need.title,
+                'isCreator': False,  # User is helping, not creator
+                'otherUser': {
+                    'id': other_user.id,
+                    'username': other_user.username,
+                    'email': other_user.email or '',
+                    'first_name': other_user.first_name or '',
+                    'last_name': other_user.last_name or '',
+                    'full_name': f"{other_user.first_name} {other_user.last_name}".strip() or other_user.username,
+                    'profile': profile_data
+                },
+                'lastMessage': last_message.content if last_message else '',
+                'lastMessageTime': last_message.created_at.isoformat() if last_message else None,
+                'unreadCount': unread_count,
+                'interestStatus': interest.status
+            })
+        
+        # Remove duplicates (same offer/need with multiple interests)
+        seen = {}
+        unique_conversations = []
+        for conv in conversations:
+            key = conv['id']
+            if key not in seen or (conv['lastMessageTime'] and (not seen[key]['lastMessageTime'] or conv['lastMessageTime'] > seen[key]['lastMessageTime'])):
+                seen[key] = conv
+        
+        unique_conversations = list(seen.values())
+        
+        # Sort by last message time (most recent first)
+        unique_conversations.sort(key=lambda x: x['lastMessageTime'] or '', reverse=True)
+        
+        response = JsonResponse({
+            'conversations': unique_conversations
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
+    except Exception as e:
+        response = JsonResponse({
+            'message': f'Failed to fetch conversations: {str(e)}'
+        }, status=500)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+def api_conversation_messages(request, conversation_id):
+    """API endpoint for retrieving messages in an offer/need-based conversation."""
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    # Authenticate user
+    user = None
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        user = get_user_from_token(token)
+    
+    if not user and request.user.is_authenticated:
+        user = request.user
+    
+    if not user:
+        response = JsonResponse({
+            'detail': 'Authentication required',
+            'message': 'Authentication required'
+        }, status=401)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    try:
+        # Parse conversation_id (format: "offer_{id}" or "need_{id}")
+        parts = conversation_id.split('_')
+        if len(parts) < 2:
+            response = JsonResponse({
+                'message': 'Invalid conversation ID format'
+            }, status=400)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+        
+        conv_type = parts[0]
+        item_id = int(parts[1])
+        
+        other_user = None
+        interest = None
+        
+        if conv_type == 'offer':
+            try:
+                offer = Offer.objects.get(pk=item_id)
+            except Offer.DoesNotExist:
+                response = JsonResponse({
+                    'message': 'Offer not found'
+                }, status=404)
+                response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                response["Access-Control-Allow-Credentials"] = "true"
+                return response
+            
+            # Determine other user and get/create interest
+            if offer.user == user:
+                # User is the offer creator, get the first interest (or create one if none)
+                interest = OfferInterest.objects.filter(offer=offer).exclude(user=user).first()
+                if not interest:
+                    response = JsonResponse({
+                        'message': 'No conversation found for this offer'
+                    }, status=404)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+                other_user = interest.user
+            else:
+                # User is interested in the offer
+                interest, created = OfferInterest.objects.get_or_create(
+                    offer=offer,
+                    user=user,
+                    defaults={'status': 'pending'}
+                )
+                other_user = offer.user
+            
+            # Get messages for this offer interest
+            messages = Message.objects.filter(offer_interest=interest).order_by('created_at')
+            
+        elif conv_type == 'need':
+            try:
+                need = Need.objects.get(pk=item_id)
+            except Need.DoesNotExist:
+                response = JsonResponse({
+                    'message': 'Need not found'
+                }, status=404)
+                response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                response["Access-Control-Allow-Credentials"] = "true"
+                return response
+            
+            # Determine other user and get/create interest
+            if need.user == user:
+                # User is the need creator, get the first interest (or create one if none)
+                interest = NeedInterest.objects.filter(need=need).exclude(user=user).first()
+                if not interest:
+                    response = JsonResponse({
+                        'message': 'No conversation found for this need'
+                    }, status=404)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+                other_user = interest.user
+            else:
+                # User wants to help with the need
+                interest, created = NeedInterest.objects.get_or_create(
+                    need=need,
+                    user=user,
+                    defaults={'status': 'pending'}
+                )
+                other_user = need.user
+            
+            # Get messages for this need interest
+            messages = Message.objects.filter(need_interest=interest).order_by('created_at')
+        else:
+            response = JsonResponse({
+                'message': 'Invalid conversation type'
+            }, status=400)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+        
+        # Mark messages as read
+        if conv_type == 'offer':
+            Message.objects.filter(
+                offer_interest=interest,
+                sender=other_user,
+                recipient=user,
+                is_read=False
+            ).update(is_read=True)
+        else:
+            Message.objects.filter(
+                need_interest=interest,
+                sender=other_user,
+                recipient=user,
+                is_read=False
+            ).update(is_read=True)
+        
+        messages_data = []
+        for message in messages:
+            messages_data.append({
+                'id': message.id,
+                'sender': {
+                    'id': message.sender.id,
+                    'username': message.sender.username,
+                    'first_name': message.sender.first_name or '',
+                    'last_name': message.sender.last_name or '',
+                    'full_name': f"{message.sender.first_name} {message.sender.last_name}".strip() or message.sender.username
+                },
+                'content': message.content,
+                'created_at': message.created_at.isoformat(),
+                'is_read': message.is_read
+            })
+        
+        # Get handshake if exists
+        handshake = None
+        if conv_type == 'offer' and interest:
+            try:
+                handshake = Handshake.objects.get(offer_interest=interest)
+            except Handshake.DoesNotExist:
+                pass
+        elif conv_type == 'need' and interest:
+            try:
+                handshake = Handshake.objects.get(need_interest=interest)
+            except Handshake.DoesNotExist:
+                pass
+        
+        response_data = {
+            'messages': messages_data,
+            'conversationType': conv_type,
+            'interestStatus': interest.status if interest else None,
+            'handshake': {
+                'id': handshake.id,
+                'status': handshake.status
+            } if handshake else None
+        }
+        
+        response = JsonResponse(response_data, status=200)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
+    except Exception as e:
+        response = JsonResponse({
+            'message': f'Failed to fetch messages: {str(e)}'
+        }, status=500)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response

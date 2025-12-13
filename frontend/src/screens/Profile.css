@@ -70,6 +70,30 @@
   opacity: 1;
 }
 
+.logout-button {
+  margin-left: 12px;
+  padding: 8px 16px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(244, 67, 54, 0.2);
+}
+
+.logout-button:hover {
+  background: #d32f2f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
+}
+
+.logout-button:active {
+  transform: translateY(0);
+}
+
 .profile-info {
   display: flex;
   gap: 32px;
@@ -85,6 +109,14 @@
   font-weight: 600;
   color: #333;
   margin-bottom: 12px;
+}
+
+.profile-username {
+  font-size: 16px;
+  font-weight: 400;
+  color: #666;
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
 .profile-rank {
@@ -352,6 +384,17 @@
 
   .save-button,
   .cancel-button {
+    width: 100%;
+  }
+
+  .profile-section-title {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .logout-button {
+    margin-left: 0;
+    margin-top: 8px;
     width: 100%;
   }
 }

@@ -65,7 +65,7 @@ function OfferDetail() {
           durationValue = offer.duration;
         }
       }
-      
+
       // Initialize form data when entering edit mode
       setFormData({
         title: offer.title || "",
@@ -150,13 +150,16 @@ function OfferDetail() {
   };
 
   const handleProfileClick = () => {
-    // TODO: Navigate to profile page when implemented
-    console.log("Navigate to profile:", offer?.user?.id);
+    if (offer?.user?.id) {
+      navigate(`/profile/${offer.user.id}`);
+    }
   };
 
   const handleMessage = () => {
-    // TODO: Implement messaging functionality
-    console.log("Message clicked for offer:", offer?.id);
+    if (offer?.id) {
+      // Navigate to messages page with offer conversation
+      navigate(`/messages?conversation=offer_${offer.id}`);
+    }
   };
 
   const handleEdit = () => {
@@ -289,7 +292,9 @@ function OfferDetail() {
           location: formData.location || "",
           tags: selectedTags,
           frequency: formData.frequency || "",
-          duration: formData.duration ? `${formData.duration} ${formData.durationUnit}` : "",
+          duration: formData.duration
+            ? `${formData.duration} ${formData.durationUnit}`
+            : "",
           minPeople: formData.minPeople ? parseInt(formData.minPeople) : null,
           maxPeople: formData.maxPeople ? parseInt(formData.maxPeople) : null,
         });
@@ -506,7 +511,10 @@ function OfferDetail() {
                     <label>Number of People:</label>
                     <div className="people-count-container">
                       <div className="people-input-wrapper">
-                        <label htmlFor="edit-minPeople" className="people-input-label">
+                        <label
+                          htmlFor="edit-minPeople"
+                          className="people-input-label"
+                        >
                           Min
                         </label>
                         <input
@@ -522,7 +530,10 @@ function OfferDetail() {
                       </div>
                       <span className="people-separator">-</span>
                       <div className="people-input-wrapper">
-                        <label htmlFor="edit-maxPeople" className="people-input-label">
+                        <label
+                          htmlFor="edit-maxPeople"
+                          className="people-input-label"
+                        >
                           Max
                         </label>
                         <input
@@ -652,14 +663,22 @@ function OfferDetail() {
                   <div className="offer-detail-meta">
                     {offer.frequency && (
                       <div className="offer-detail-meta-item">
-                        <span className="offer-detail-meta-label">Frequency: </span>
-                        <span className="offer-detail-meta-value">{offer.frequency}</span>
+                        <span className="offer-detail-meta-label">
+                          Frequency:{" "}
+                        </span>
+                        <span className="offer-detail-meta-value">
+                          {offer.frequency}
+                        </span>
                       </div>
                     )}
                     {offer.duration && (
                       <div className="offer-detail-meta-item">
-                        <span className="offer-detail-meta-label">Duration: </span>
-                        <span className="offer-detail-meta-value">{offer.duration}</span>
+                        <span className="offer-detail-meta-label">
+                          Duration:{" "}
+                        </span>
+                        <span className="offer-detail-meta-value">
+                          {offer.duration}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -668,14 +687,22 @@ function OfferDetail() {
                   <div className="offer-detail-meta">
                     {offer.min_people && (
                       <div className="offer-detail-meta-item">
-                        <span className="offer-detail-meta-label">Min People: </span>
-                        <span className="offer-detail-meta-value">{offer.min_people}</span>
+                        <span className="offer-detail-meta-label">
+                          Min People:{" "}
+                        </span>
+                        <span className="offer-detail-meta-value">
+                          {offer.min_people}
+                        </span>
                       </div>
                     )}
                     {offer.max_people && (
                       <div className="offer-detail-meta-item">
-                        <span className="offer-detail-meta-label">Max People: </span>
-                        <span className="offer-detail-meta-value">{offer.max_people}</span>
+                        <span className="offer-detail-meta-label">
+                          Max People:{" "}
+                        </span>
+                        <span className="offer-detail-meta-value">
+                          {offer.max_people}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -696,9 +723,11 @@ function OfferDetail() {
                   </div>
                 )}
                 <div className="offer-detail-actions">
-                  <button className="message-button" onClick={handleMessage}>
-                    Message
-                  </button>
+                  {!isOwner && (
+                    <button className="message-button" onClick={handleMessage}>
+                      Message
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -710,4 +739,3 @@ function OfferDetail() {
 }
 
 export default OfferDetail;
-
