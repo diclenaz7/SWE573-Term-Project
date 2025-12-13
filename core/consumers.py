@@ -4,7 +4,8 @@ from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db.models import Q
-from core.models import Message, Handshake, Offer, Need, OfferInterest, NeedInterest
+from core.models import Message, Handshake, Offer, Need, OfferInterest, NeedInterest, HoneyBalance, parse_duration_to_hours
+from django.core.exceptions import ValidationError
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -209,13 +210,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 # Handle handshake initiation (based on offer/need)
                 handshake = await self.create_handshake()
                 if handshake:
-                    await self.channel_layer.group_send(
-                        self.room_group_name,
-                        {
-                            'type': 'handshake_update',
-                            'handshake': handshake
-                        }
-                    )
+                    # Check if it's an error response
+                    if 'error' in handshake:
+                        await self.send(text_data=json.dumps({
+                            'type': 'error',
+                            'message': handshake.get('message', 'Failed to create handshake')
+                        }))
+                    else:
+                        await self.channel_layer.group_send(
+                            self.room_group_name,
+                            {
+                                'type': 'handshake_update',
+                                'handshake': handshake
+                            }
+                        )
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'message': 'Failed to create handshake'
+                    }))
             
             elif message_type == 'handshake_approve':
                 # Handle handshake approval
@@ -356,13 +369,41 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         'message': 'Handshake already exists'
                     }
                 
-                # Create handshake
+                # Get duration and calculate honey amount
+                duration_hours = parse_duration_to_hours(offer.duration) if offer.duration else 0
+                
+                # Get or create honey balance for spender (user2 - acceptor)
+                honey_balance, _ = HoneyBalance.objects.get_or_create(
+                    user=self.user,
+                    defaults={'total_honey': 0, 'provisioned_honey': 0}
+                )
+                
+                # Check if user has enough usable honey
+                if not honey_balance.can_afford(duration_hours):
+                    return {
+                        'error': 'Insufficient honey balance',
+                        'message': f'You need {duration_hours} honey but only have {honey_balance.usable_honey} usable honey.'
+                    }
+                
+                # Create handshake with honey amount
                 handshake = Handshake.objects.create(
                     offer_interest=interest,
                     user1=offer.user,
                     user2=self.user,
-                    status='active'
+                    status='active',
+                    honey_amount=duration_hours
                 )
+                
+                # Provision honey from spender
+                try:
+                    honey_balance.provision(duration_hours)
+                except ValidationError as e:
+                    # Rollback handshake creation if provisioning fails
+                    handshake.delete()
+                    return {
+                        'error': 'Failed to provision honey',
+                        'message': str(e)
+                    }
             elif conv_type == 'need':
                 need = Need.objects.get(pk=item_id)
                 if need.user == self.user:
@@ -383,13 +424,41 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         'message': 'Handshake already exists'
                     }
                 
-                # Create handshake
+                # Get duration and calculate honey amount
+                duration_hours = parse_duration_to_hours(need.duration) if need.duration else 0
+                
+                # Get or create honey balance for spender (user1 - creator)
+                honey_balance, _ = HoneyBalance.objects.get_or_create(
+                    user=need.user,
+                    defaults={'total_honey': 0, 'provisioned_honey': 0}
+                )
+                
+                # Check if user has enough usable honey
+                if not honey_balance.can_afford(duration_hours):
+                    return {
+                        'error': 'Insufficient honey balance',
+                        'message': f'You need {duration_hours} honey but only have {honey_balance.usable_honey} usable honey.'
+                    }
+                
+                # Create handshake with honey amount
                 handshake = Handshake.objects.create(
                     need_interest=interest,
                     user1=need.user,
                     user2=self.user,
-                    status='active'
+                    status='active',
+                    honey_amount=duration_hours
                 )
+                
+                # Provision honey from spender
+                try:
+                    honey_balance.provision(duration_hours)
+                except ValidationError as e:
+                    # Rollback handshake creation if provisioning fails
+                    handshake.delete()
+                    return {
+                        'error': 'Failed to provision honey',
+                        'message': str(e)
+                    }
             else:
                 return None
             
