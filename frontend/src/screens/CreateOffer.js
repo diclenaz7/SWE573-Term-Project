@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/common/header";
+import LocationSearch from "../components/common/LocationSearch";
 import "./CreateOffer.css";
 import { BASE_URL } from "../constants";
 import { getAuthHeaders, getToken } from "../utils/auth";
@@ -14,6 +15,8 @@ function CreateOffer() {
     description: "",
     category: [],
     location: "",
+    latitude: null,
+    longitude: null,
     image: null,
     frequency: "",
     duration: "1",
@@ -123,6 +126,13 @@ function CreateOffer() {
     setError("");
     setSubmitting(true);
 
+    // Validate location
+    if (!formData.latitude || !formData.longitude) {
+      setError("Please select a location from the map or search results.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const token = getToken();
       const headers = {};
@@ -135,7 +145,11 @@ function CreateOffer() {
 
       formDataToSend.append("title", formData.title);
       formDataToSend.append("description", formData.description);
-      formDataToSend.append("location", formData.location);
+      formDataToSend.append("location", formData.location || "");
+      if (formData.latitude !== null && formData.longitude !== null) {
+        formDataToSend.append("latitude", formData.latitude.toString());
+        formDataToSend.append("longitude", formData.longitude.toString());
+      }
 
       // Add tags
       formData.category.forEach((tag) => {
@@ -286,14 +300,25 @@ function CreateOffer() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="location">Location:</label>
-                <input
-                  type="text"
-                  id="location"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  placeholder="Enter location"
+                <label htmlFor="location">Location: *</label>
+                <LocationSearch
+                  onLocationSelect={(locationData) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      location: locationData.address || "",
+                      latitude: locationData.latitude,
+                      longitude: locationData.longitude,
+                    }));
+                  }}
+                  initialLocation={
+                    formData.latitude && formData.longitude
+                      ? {
+                          address: formData.location,
+                          latitude: formData.latitude,
+                          longitude: formData.longitude,
+                        }
+                      : null
+                  }
                 />
               </div>
 

@@ -1,0 +1,143 @@
+.map-component-container {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.map-wrapper-inline {
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.map-wrapper-inline .leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 12px;
+}
+
+.custom-marker-icon {
+  background: transparent;
+  border: none;
+}
+
+.map-info-card-inline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffc107;
+  padding: 20px;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.info-card-content {
+  max-width: 100%;
+}
+
+.info-card-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #8b4513;
+}
+
+.info-card-type {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #8b4513;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-card-description {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #8b4513;
+  line-height: 1.5;
+}
+
+.info-card-location {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #8b4513;
+}
+
+.see-details-button {
+  background: white;
+  border: 2px solid #8b4513;
+  color: #8b4513;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.see-details-button:hover {
+  background: #8b4513;
+  color: white;
+}
+
+.marker-popup {
+  text-align: center;
+  min-width: 150px;
+}
+
+.marker-popup h3 {
+  margin: 0 0 5px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.marker-popup .marker-type {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+/* Leaflet popup customization */
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+}
+
+.leaflet-popup-content {
+  margin: 10px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .map-info-card-inline {
+    padding: 15px;
+  }
+
+  .info-card-title {
+    font-size: 16px;
+  }
+
+  .see-details-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
