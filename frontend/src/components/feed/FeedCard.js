@@ -57,6 +57,20 @@ function FeedCard({ item }) {
           </div>
           <h3 className="feed-item-title">{item.title}</h3>
           <p className="feed-item-description">{item.description}</p>
+          {item.duration && (
+            <div className="feed-item-honey">
+              <span className="honey-icon-small">🍯</span>
+              <span className="honey-value-small">
+                {(() => {
+                  // Parse duration to get hours
+                  const durationStr = item.duration || "";
+                  const match = durationStr.match(/(\d+)/);
+                  return match ? match[1] : "0";
+                })()}
+              </span>
+              <span className="honey-label-small">hour(s)</span>
+            </div>
+          )}
           <div className="feed-item-footer">
             <div className="feed-item-meta">
               <span className="feed-item-author">

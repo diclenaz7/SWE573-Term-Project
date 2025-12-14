@@ -359,6 +359,7 @@ class Command(BaseCommand):
                 'tags': ['gardening', 'outdoor'],
                 'is_reciprocal': True,
                 'contact_preference': 'message',
+                'duration': '3 Hours',
                 'expires_at': now + timedelta(days=30),
             },
             {
@@ -372,6 +373,7 @@ class Command(BaseCommand):
                 'tags': ['technology', 'computers'],
                 'is_reciprocal': False,
                 'contact_preference': 'email',
+                'duration': '2 Hours',
                 'expires_at': now + timedelta(days=25),
             },
             {
@@ -385,6 +387,7 @@ class Command(BaseCommand):
                 'tags': ['cooking', 'food'],
                 'is_reciprocal': True,
                 'contact_preference': 'any',
+                'duration': '1 Hour',
                 'expires_at': now + timedelta(days=29),
             },
             {
@@ -398,6 +401,7 @@ class Command(BaseCommand):
                 'tags': ['pets', 'care'],
                 'is_reciprocal': False,
                 'contact_preference': 'phone',
+                'duration': '2 Hours',
                 'expires_at': now + timedelta(days=27),
             },
             {
@@ -411,6 +415,7 @@ class Command(BaseCommand):
                 'tags': ['repairs'],
                 'is_reciprocal': True,
                 'contact_preference': 'message',
+                'duration': '2 Hours',
                 'expires_at': now + timedelta(days=20),
             },
             {
@@ -424,6 +429,7 @@ class Command(BaseCommand):
                 'tags': ['tutoring', 'education'],
                 'is_reciprocal': False,
                 'contact_preference': 'email',
+                'duration': '1 Hour',
                 'expires_at': now + timedelta(days=35),
             },
             {
@@ -437,6 +443,7 @@ class Command(BaseCommand):
                 'tags': ['cooking', 'food'],
                 'is_reciprocal': True,
                 'contact_preference': 'any',
+                'duration': '2 Hours',
                 'expires_at': now + timedelta(days=28),
                 "image": "https://media.gettyimages.com/id/1477422276/photo/male-chef-plating-food-in-plate-while-working-in-commercial-kitchen.jpg?s=1024x1024&w=gi&k=20&c=pRrN47XnI0v1HDEjrkdwGjfD7mhmNSVTBKKanKeaCLw="
             },
@@ -451,6 +458,7 @@ class Command(BaseCommand):
                 'tags': ['transportation', 'delivery'],
                 'is_reciprocal': False,
                 'contact_preference': 'phone',
+                'duration': '1 Hour',
                 'expires_at': now + timedelta(days=22),
                 "image": "https://media.gettyimages.com/id/1582802930/photo/happy-man-driving-his-car.jpg?s=2048x2048&w=gi&k=20&c=CtNb9STCwUNFmZktd-5DYmbf-GB32G_fcXS-j6j1Gko=",
             },
@@ -490,6 +498,7 @@ class Command(BaseCommand):
                 'status': 'open',
                 'tags': ['childcare', 'babysitting'],
                 'contact_preference': 'message',
+                'duration': '2 Hours',
                 'expires_at': now + timedelta(days=6),
             },
             {
@@ -502,6 +511,7 @@ class Command(BaseCommand):
                 'status': 'open',
                 'tags': ['moving', 'heavy lifting'],
                 'contact_preference': 'phone',
+                'duration': '1 Hour',
                 'expires_at': now + timedelta(days=26),
             },
             {
@@ -514,6 +524,7 @@ class Command(BaseCommand):
                 'status': 'open',
                 'tags': ['tutoring', 'education'],
                 'contact_preference': 'message',
+                'duration': '1 Hour',
                 'expires_at': now + timedelta(days=24),
             },
             {
@@ -526,6 +537,7 @@ class Command(BaseCommand):
                 'status': 'open',
                 'tags': ['automotive', 'emergency'],
                 'contact_preference': 'phone',
+                'duration': '1 Hour',
                 'expires_at': now + timedelta(days=30),
             },
             {
@@ -538,6 +550,7 @@ class Command(BaseCommand):
                 'status': 'open',
                 'tags': ['cleaning'],
                 'contact_preference': 'message',
+                'duration': '3 Hours',
                 'expires_at': now + timedelta(days=15),
             },
             {
@@ -550,6 +563,7 @@ class Command(BaseCommand):
                 'status': 'open',
                 'tags': ['delivery'],
                 'contact_preference': 'phone',
+                'duration': '1 Hour',
                 'expires_at': now + timedelta(days=18),
             },
         ]

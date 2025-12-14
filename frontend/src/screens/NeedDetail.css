@@ -150,6 +150,69 @@
   white-space: pre-wrap;
 }
 
+.need-detail-honey {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: white;
+  border-radius: 12px;
+  border: 2px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.need-detail-honey::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.need-detail-honey .honey-icon-detail {
+  font-size: 32px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.need-detail-honey .honey-info-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.need-detail-honey .honey-label-detail {
+  font-size: 11px;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  opacity: 0.8;
+}
+
+.need-detail-honey .honey-value-detail {
+  font-size: 32px;
+  font-weight: 800;
+  color: #667eea;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
+  text-shadow: 0 2px 4px rgba(102, 126, 234, 0.15);
+}
+
+.need-detail-honey .honey-unit-detail {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
 .need-detail-tags {
   display: flex;
   flex-wrap: wrap;
@@ -545,4 +608,3 @@
     width: 100%;
   }
 }
-

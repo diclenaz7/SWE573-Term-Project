@@ -15,6 +15,7 @@ function CreateNeed() {
     category: [],
     location: "",
     image: null,
+    duration: "1",
   });
   const [selectedTags, setSelectedTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
@@ -140,6 +141,13 @@ function CreateNeed() {
       if (formData.image) {
         formDataToSend.append("image", formData.image);
       }
+
+      // Duration is required - send as "X Hour" or "X Hours"
+      const hours = parseInt(formData.duration) || 1;
+      formDataToSend.append(
+        "duration",
+        `${hours} ${hours === 1 ? "Hour" : "Hours"}`
+      );
 
       const response = await fetch(`${BASE_URL}/api/needs/`, {
         method: "POST",
@@ -272,6 +280,25 @@ function CreateNeed() {
                   onChange={handleInputChange}
                   placeholder="Enter location"
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="duration">Duration (Hours) *:</label>
+                <div className="duration-input-container">
+                  <input
+                    type="number"
+                    id="duration"
+                    name="duration"
+                    value={formData.duration}
+                    onChange={handleInputChange}
+                    min="1"
+                    step="1"
+                    required
+                    className="duration-input"
+                    placeholder="1"
+                  />
+                  <span className="duration-unit">hour(s)</span>
+                </div>
               </div>
 
               <div className="form-group">

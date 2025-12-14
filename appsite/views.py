@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.db.models import Q
-from core.models import Offer, Need, Tag, UserProfile, Message, OfferInterest, NeedInterest, Handshake
+from core.models import Offer, Need, Tag, UserProfile, Message, OfferInterest, NeedInterest, Handshake, HoneyBalance
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.uploadhandler import MemoryFileUploadHandler
@@ -112,6 +112,12 @@ def api_register(request):
         
         if form.is_valid():
             user = form.save()
+            # Create initial honey balance with 3 honey credits
+            HoneyBalance.objects.create(
+                user=user,
+                total_honey=3,
+                provisioned_honey=0
+            )
             return JsonResponse({
                 'message': f'Account created for {user.username}! You can now log in.',
                 'user': {
@@ -291,6 +297,15 @@ def api_profile(request, user_id=None):
             if not full_name:
                 full_name = profile_user.username
             
+            # Get or create honey balance
+            honey_balance, _ = HoneyBalance.objects.get_or_create(
+                user=profile_user,
+                defaults={
+                    'total_honey': 3,
+                    'provisioned_honey': 0
+                }
+            )
+            
             profile_data = {
                 'id': profile.id,
                 'is_own_profile': is_own_profile,
@@ -311,6 +326,11 @@ def api_profile(request, user_id=None):
                 'rank_display': profile.get_rank_display(),
                 'created_at': profile.created_at.isoformat(),
                 'updated_at': profile.updated_at.isoformat(),
+                'honey_balance': {
+                    'total_honey': honey_balance.total_honey,
+                    'usable_honey': honey_balance.usable_honey,
+                    'provisioned_honey': honey_balance.provisioned_honey,
+                },
                 'offers': offers_data,
                 'needs': needs_data,
             }
@@ -370,6 +390,15 @@ def api_profile(request, user_id=None):
         if not full_name:
             full_name = profile_user.username
         
+        # Get or create honey balance
+        honey_balance, _ = HoneyBalance.objects.get_or_create(
+            user=profile_user,
+            defaults={
+                'total_honey': 3,
+                'provisioned_honey': 0
+            }
+        )
+        
         profile_data = {
             'id': profile.id,
             'is_own_profile': True,
@@ -390,6 +419,11 @@ def api_profile(request, user_id=None):
             'rank_display': profile.get_rank_display(),
             'created_at': profile.created_at.isoformat(),
             'updated_at': profile.updated_at.isoformat(),
+            'honey_balance': {
+                'total_honey': honey_balance.total_honey,
+                'usable_honey': honey_balance.usable_honey,
+                'provisioned_honey': honey_balance.provisioned_honey,
+            },
         }
         
         response = JsonResponse(profile_data, status=200)
@@ -466,6 +500,15 @@ def api_people(request):
             offer_count = Offer.objects.filter(user=user).count()
             need_count = Need.objects.filter(user=user).count()
             
+            # Get or create honey balance
+            honey_balance, _ = HoneyBalance.objects.get_or_create(
+                user=user,
+                defaults={
+                    'total_honey': 3,
+                    'provisioned_honey': 0
+                }
+            )
+            
             people_data.append({
                 'id': user.id,
                 'username': user.username,
@@ -480,6 +523,11 @@ def api_people(request):
                     'reputation_score': float(profile.reputation_score),
                     'rank': profile.rank,
                     'rank_display': profile.get_rank_display(),
+                    'honey_balance': {
+                        'total_honey': honey_balance.total_honey,
+                        'usable_honey': honey_balance.usable_honey,
+                        'provisioned_honey': honey_balance.provisioned_honey,
+                    },
                 },
                 'offer_count': offer_count,
                 'need_count': need_count,
@@ -654,6 +702,16 @@ def api_offers(request):
             errors['description'] = ['Description is required.']
         elif len(description) < 20:
             errors['description'] = ['Description must be at least 20 characters long.']
+        
+        # Duration is required
+        if not duration:
+            errors['duration'] = ['Duration (hours) is required.']
+        else:
+            # Parse duration to validate it's a valid number
+            from core.models import parse_duration_to_hours
+            hours = parse_duration_to_hours(duration)
+            if hours < 1:
+                errors['duration'] = ['Duration must be at least 1 hour.']
         
         if errors:
             # Format error message for frontend
@@ -1084,6 +1142,7 @@ def api_needs(request):
                     'updated_at': need.updated_at.isoformat(),
                     'expires_at': need.expires_at.isoformat() if need.expires_at else None,
                     'image': image_url,
+                    'duration': need.duration or '',
                 }
                 needs_data.append(need_data)
             
@@ -1128,6 +1187,7 @@ def api_needs(request):
             description = request.POST.get('description', '')
             location = request.POST.get('location', '')
             image = request.FILES.get('image', None)
+            duration = request.POST.get('duration', '')
             
             # Get tags (can be multiple)
             tag_names = request.POST.getlist('tags') or []
@@ -1138,6 +1198,7 @@ def api_needs(request):
             description = body.get('description', '')
             location = body.get('location', '')
             image = None  # Can't send files via JSON
+            duration = body.get('duration', '')
             
             # Get tags (can be multiple)
             tag_names = body.get('tags', [])
@@ -1156,6 +1217,16 @@ def api_needs(request):
         elif len(description) < 20:
             errors['description'] = ['Description must be at least 20 characters long.']
         
+        # Duration is required
+        if not duration:
+            errors['duration'] = ['Duration (hours) is required.']
+        else:
+            # Parse duration to validate it's a valid number
+            from core.models import parse_duration_to_hours
+            hours = parse_duration_to_hours(duration)
+            if hours < 1:
+                errors['duration'] = ['Duration must be at least 1 hour.']
+        
         if errors:
             # Format error message for frontend
             error_messages = []
@@ -1173,6 +1244,7 @@ def api_needs(request):
             description=description,
             location=location,
             image=image,  # Django ImageField handles None automatically
+            duration=duration,
         )
 
         # Handle tags - create or get existing tags
@@ -1270,6 +1342,7 @@ def api_need_detail(request, need_id):
                 'updated_at': need.updated_at.isoformat(),
                 'expires_at': need.expires_at.isoformat() if need.expires_at else None,
                 'image': image_url,
+                'duration': need.duration or '',
             }
             
             response = JsonResponse(need_data, status=200)
@@ -1309,6 +1382,7 @@ def api_need_detail(request, need_id):
             description = None
             location = None
             image = None
+            duration = None
             tag_names = []
             
             if 'multipart/form-data' in content_type:
@@ -1319,6 +1393,7 @@ def api_need_detail(request, need_id):
                     title = request.POST.get('title', None)
                     description = request.POST.get('description', None)
                     location = request.POST.get('location', None)
+                    duration = request.POST.get('duration', None)
                     tag_names = request.POST.getlist('tags') or []
                 
                 if hasattr(request, 'FILES') and request.FILES:
@@ -1330,6 +1405,7 @@ def api_need_detail(request, need_id):
                     title = body.get('title', None)
                     description = body.get('description', None)
                     location = body.get('location', None)
+                    duration = body.get('duration', None)
                     
                     # Get tags (can be multiple)
                     tag_names = body.get('tags', [])
@@ -1376,6 +1452,9 @@ def api_need_detail(request, need_id):
             if location is not None:
                 need.location = location
             
+            if duration is not None:
+                need.duration = duration
+            
             if image is not None:
                 need.image = image
             
@@ -1420,6 +1499,7 @@ def api_need_detail(request, need_id):
                 'updated_at': need.updated_at.isoformat(),
                 'expires_at': need.expires_at.isoformat() if need.expires_at else None,
                 'image': image_url,
+                'duration': need.duration or '',
             }
             
             response = JsonResponse(need_data, status=200)
@@ -1501,14 +1581,45 @@ def api_conversations(request):
                 # Get other user's profile
                 try:
                     profile = other_user.profile
+                    # Get or create honey balance
+                    honey_balance, _ = HoneyBalance.objects.get_or_create(
+                        user=other_user,
+                        defaults={
+                            'total_honey': 3,
+                            'provisioned_honey': 0
+                        }
+                    )
                     profile_data = {
                         'profile_image': profile.profile_image.url if profile.profile_image else None,
                         'bio': profile.bio or '',
                         'rank': profile.rank or 'newbee',
-                        'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                        'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
+                        'honey_balance': {
+                            'total_honey': honey_balance.total_honey,
+                            'usable_honey': honey_balance.usable_honey,
+                            'provisioned_honey': honey_balance.provisioned_honey,
+                        },
                     }
                 except UserProfile.DoesNotExist:
-                    profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+                    # Get or create honey balance even if profile doesn't exist
+                    honey_balance, _ = HoneyBalance.objects.get_or_create(
+                        user=other_user,
+                        defaults={
+                            'total_honey': 3,
+                            'provisioned_honey': 0
+                        }
+                    )
+                    profile_data = {
+                        'profile_image': None, 
+                        'bio': '', 
+                        'rank': 'newbee', 
+                        'rank_display': 'New Bee',
+                        'honey_balance': {
+                            'total_honey': honey_balance.total_honey,
+                            'usable_honey': honey_balance.usable_honey,
+                            'provisioned_honey': honey_balance.provisioned_honey,
+                        },
+                    }
                 
                 conversations.append({
                     'id': f"offer_{offer.id}",
@@ -1552,14 +1663,45 @@ def api_conversations(request):
             # Get other user's profile
             try:
                 profile = other_user.profile
+                # Get or create honey balance
+                honey_balance, _ = HoneyBalance.objects.get_or_create(
+                    user=other_user,
+                    defaults={
+                        'total_honey': 3,
+                        'provisioned_honey': 0
+                    }
+                )
                 profile_data = {
                     'profile_image': profile.profile_image.url if profile.profile_image else None,
                     'bio': profile.bio or '',
                     'rank': profile.rank or 'newbee',
-                    'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                    'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
+                    'honey_balance': {
+                        'total_honey': honey_balance.total_honey,
+                        'usable_honey': honey_balance.usable_honey,
+                        'provisioned_honey': honey_balance.provisioned_honey,
+                    },
                 }
             except UserProfile.DoesNotExist:
-                profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+                # Get or create honey balance even if profile doesn't exist
+                honey_balance, _ = HoneyBalance.objects.get_or_create(
+                    user=other_user,
+                    defaults={
+                        'total_honey': 3,
+                        'provisioned_honey': 0
+                    }
+                )
+                profile_data = {
+                    'profile_image': None, 
+                    'bio': '', 
+                    'rank': 'newbee', 
+                    'rank_display': 'New Bee',
+                    'honey_balance': {
+                        'total_honey': float(honey_balance.total_honey),
+                        'usable_honey': float(honey_balance.usable_honey),
+                        'provisioned_honey': float(honey_balance.provisioned_honey),
+                    },
+                }
             
             conversations.append({
                 'id': f"offer_{offer.id}",
@@ -1606,14 +1748,45 @@ def api_conversations(request):
                 # Get other user's profile
                 try:
                     profile = other_user.profile
+                    # Get or create honey balance
+                    honey_balance, _ = HoneyBalance.objects.get_or_create(
+                        user=other_user,
+                        defaults={
+                            'total_honey': 3,
+                            'provisioned_honey': 0
+                        }
+                    )
                     profile_data = {
                         'profile_image': profile.profile_image.url if profile.profile_image else None,
                         'bio': profile.bio or '',
                         'rank': profile.rank or 'newbee',
-                        'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                        'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
+                        'honey_balance': {
+                            'total_honey': honey_balance.total_honey,
+                            'usable_honey': honey_balance.usable_honey,
+                            'provisioned_honey': honey_balance.provisioned_honey,
+                        },
                     }
                 except UserProfile.DoesNotExist:
-                    profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+                    # Get or create honey balance even if profile doesn't exist
+                    honey_balance, _ = HoneyBalance.objects.get_or_create(
+                        user=other_user,
+                        defaults={
+                            'total_honey': 3,
+                            'provisioned_honey': 0
+                        }
+                    )
+                    profile_data = {
+                        'profile_image': None, 
+                        'bio': '', 
+                        'rank': 'newbee', 
+                        'rank_display': 'New Bee',
+                        'honey_balance': {
+                            'total_honey': honey_balance.total_honey,
+                            'usable_honey': honey_balance.usable_honey,
+                            'provisioned_honey': honey_balance.provisioned_honey,
+                        },
+                    }
                 
                 conversations.append({
                     'id': f"need_{need.id}",
@@ -1657,14 +1830,45 @@ def api_conversations(request):
             # Get other user's profile
             try:
                 profile = other_user.profile
+                # Get or create honey balance
+                honey_balance, _ = HoneyBalance.objects.get_or_create(
+                    user=other_user,
+                    defaults={
+                        'total_honey': 3,
+                        'provisioned_honey': 0
+                    }
+                )
                 profile_data = {
                     'profile_image': profile.profile_image.url if profile.profile_image else None,
                     'bio': profile.bio or '',
                     'rank': profile.rank or 'newbee',
-                    'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee'
+                    'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
+                    'honey_balance': {
+                        'total_honey': honey_balance.total_honey,
+                        'usable_honey': honey_balance.usable_honey,
+                        'provisioned_honey': honey_balance.provisioned_honey,
+                    },
                 }
             except UserProfile.DoesNotExist:
-                profile_data = {'profile_image': None, 'bio': '', 'rank': 'newbee', 'rank_display': 'New Bee'}
+                # Get or create honey balance even if profile doesn't exist
+                honey_balance, _ = HoneyBalance.objects.get_or_create(
+                    user=other_user,
+                    defaults={
+                        'total_honey': 3,
+                        'provisioned_honey': 0
+                    }
+                )
+                profile_data = {
+                    'profile_image': None, 
+                    'bio': '', 
+                    'rank': 'newbee', 
+                    'rank_display': 'New Bee',
+                    'honey_balance': {
+                        'total_honey': float(honey_balance.total_honey),
+                        'usable_honey': float(honey_balance.usable_honey),
+                        'provisioned_honey': float(honey_balance.provisioned_honey),
+                    },
+                }
             
             conversations.append({
                 'id': f"need_{need.id}",
@@ -1904,6 +2108,72 @@ def api_conversation_messages(request, conversation_id):
     except Exception as e:
         response = JsonResponse({
             'message': f'Failed to fetch messages: {str(e)}'
+        }, status=500)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+def api_honey_balance(request):
+    """API endpoint to get current user's honey balance."""
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    # Authenticate user
+    user = None
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        user = get_user_from_token(token)
+    
+    if not user and request.user.is_authenticated:
+        user = request.user
+    
+    if not user:
+        response = JsonResponse({
+            'detail': 'Authentication required',
+            'message': 'Authentication required'
+        }, status=401)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    try:
+        # Get or create honey balance
+        honey_balance, created = HoneyBalance.objects.get_or_create(
+            user=user,
+            defaults={
+                'total_honey': 3,  # Give initial 3 honey if creating new balance
+                'provisioned_honey': 0
+            }
+        )
+        
+        # If balance was just created, ensure user has initial 3 honey
+        if created:
+            honey_balance.total_honey = 3
+            honey_balance.save()
+        
+        response_data = {
+            'total_honey': honey_balance.total_honey,
+            'provisioned_honey': honey_balance.provisioned_honey,
+            'usable_honey': honey_balance.usable_honey
+        }
+        
+        response = JsonResponse(response_data, status=200)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
+    except Exception as e:
+        response = JsonResponse({
+            'message': f'Failed to retrieve honey balance: {str(e)}'
         }, status=500)
         response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
         response["Access-Control-Allow-Credentials"] = "true"

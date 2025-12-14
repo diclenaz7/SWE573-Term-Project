@@ -18,6 +18,7 @@ function NeedDetail() {
     description: "",
     location: "",
     image: null,
+    duration: "1",
   });
   const [selectedTags, setSelectedTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
@@ -49,11 +50,21 @@ function NeedDetail() {
   useEffect(() => {
     if (need && isEditing) {
       // Initialize form data when entering edit mode
+      // Parse duration to extract number
+      let durationValue = "1";
+      if (need.duration) {
+        const durationMatch = need.duration.match(/(\d+)/);
+        if (durationMatch) {
+          durationValue = durationMatch[1];
+        }
+      }
+
       setFormData({
         title: need.title || "",
         description: need.description || "",
         location: need.location || "",
         image: null,
+        duration: durationValue,
       });
       setSelectedTags(need.tags ? need.tags.map((tag) => tag.name) : []);
       if (need.image) {
@@ -235,6 +246,13 @@ function NeedDetail() {
         formDataToSend.append("description", formData.description || "");
         formDataToSend.append("location", formData.location || "");
 
+        // Duration is required
+        const hours = parseInt(formData.duration) || 1;
+        formDataToSend.append(
+          "duration",
+          `${hours} ${hours === 1 ? "Hour" : "Hours"}`
+        );
+
         // Add tags
         selectedTags.forEach((tag) => {
           formDataToSend.append("tags", tag);
@@ -247,11 +265,14 @@ function NeedDetail() {
       } else {
         // Use JSON when no image
         headers["Content-Type"] = "application/json";
+        // Duration is required
+        const hours = parseInt(formData.duration) || 1;
         body = JSON.stringify({
           title: formData.title || "",
           description: formData.description || "",
           location: formData.location || "",
           tags: selectedTags,
+          duration: `${hours} ${hours === 1 ? "Hour" : "Hours"}`,
         });
         contentType = "application/json";
       }
@@ -279,6 +300,7 @@ function NeedDetail() {
           description: "",
           location: "",
           image: null,
+          duration: "1",
         });
         setSelectedTags([]);
         setTagInput("");
@@ -434,6 +456,25 @@ function NeedDetail() {
                   </div>
 
                   <div className="form-group">
+                    <label htmlFor="edit-duration">Duration (Hours) *:</label>
+                    <div className="duration-input-container">
+                      <input
+                        type="number"
+                        id="edit-duration"
+                        name="duration"
+                        value={formData.duration}
+                        onChange={handleInputChange}
+                        min="1"
+                        step="1"
+                        required
+                        className="duration-input"
+                        placeholder="1"
+                      />
+                      <span className="duration-unit">hour(s)</span>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
                     <label htmlFor="edit-image">Image:</label>
                     <div className="image-upload-container">
                       <input
@@ -523,6 +564,23 @@ function NeedDetail() {
                 <div className="need-detail-description">
                   <p>{need.description}</p>
                 </div>
+                {need.duration && (
+                  <div className="need-detail-honey">
+                    <span className="honey-icon-detail">🍯</span>
+                    <div className="honey-info-detail">
+                      <span className="honey-label-detail">Honey Value</span>
+                      <span className="honey-value-detail">
+                        {(() => {
+                          // Parse duration to get hours
+                          const durationStr = need.duration || "";
+                          const match = durationStr.match(/(\d+)/);
+                          return match ? match[1] : "0";
+                        })()}
+                      </span>
+                      <span className="honey-unit-detail">hour(s)</span>
+                    </div>
+                  </div>
+                )}
                 {need.tags && need.tags.length > 0 && (
                   <div className="need-detail-tags">
                     {need.tags.map((tag) => (
