@@ -12,8 +12,51 @@ from core.models import Offer, Need, Tag, UserProfile, Message, OfferInterest, N
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.uploadhandler import MemoryFileUploadHandler
+from urllib.parse import urljoin
 import json
 import secrets
+
+
+def build_media_url(relative_url, request=None):
+    """
+    Build an absolute URL for a media file.
+    
+    Uses BASE_URL from settings if available (for production),
+    otherwise falls back to request.build_absolute_uri() (for development).
+    
+    Args:
+        relative_url: The relative URL from the file field (e.g., '/media/image.jpg')
+        request: The HTTP request object (optional, used as fallback)
+    
+    Returns:
+        Absolute URL string or None if relative_url is None/empty or malformed
+    """
+    if not relative_url:
+        return None
+    
+    # Check if the URL is malformed (contains external URL encoded in the path)
+    # This can happen if an external URL was incorrectly saved as a file path
+    if 'http' in relative_url.lower() or 'https%3A' in relative_url.lower():
+        # This is a malformed URL - return None to prevent broken image links
+        print(f"Warning: Malformed image URL detected: {relative_url}")
+        return None
+    
+    # Use BASE_URL from settings if configured (production)
+    if settings.BASE_URL:
+        # Remove leading slash from relative_url if BASE_URL already ends with /
+        if relative_url.startswith('/'):
+            relative_url = relative_url[1:]
+        return urljoin(settings.BASE_URL, relative_url)
+    
+    # Fall back to request-based URL (development)
+    if request:
+        try:
+            return request.build_absolute_uri(relative_url)
+        except Exception:
+            pass
+    
+    # Last resort: return relative URL as-is
+    return relative_url
 
 
 def generate_token():
@@ -234,7 +277,7 @@ def api_profile(request, user_id=None):
             # Build profile image URL if exists
             profile_image_url = None
             if profile.profile_image:
-                profile_image_url = request.build_absolute_uri(profile.profile_image.url)
+                profile_image_url = build_media_url(profile.profile_image.url if profile.profile_image else None, request)
             
             # Get user's offers and needs with full data
             offers = Offer.objects.filter(user=profile_user).select_related('user').prefetch_related('tags').order_by('-created_at')
@@ -245,7 +288,7 @@ def api_profile(request, user_id=None):
                 # Build image URL if image exists
                 image_url = None
                 if offer.image:
-                    image_url = request.build_absolute_uri(offer.image.url)
+                    image_url = build_media_url(offer.image.url if offer.image else None, request)
                 
                 # Serialize tags
                 tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
@@ -271,7 +314,7 @@ def api_profile(request, user_id=None):
                 # Build image URL if image exists
                 image_url = None
                 if need.image:
-                    image_url = request.build_absolute_uri(need.image.url)
+                    image_url = build_media_url(need.image.url if need.image else None, request)
                 
                 # Serialize tags
                 tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
@@ -383,7 +426,7 @@ def api_profile(request, user_id=None):
         # Build updated profile image URL
         profile_image_url = None
         if profile.profile_image:
-            profile_image_url = request.build_absolute_uri(profile.profile_image.url)
+            profile_image_url = build_media_url(profile.profile_image.url if profile.profile_image else None, request)
         
         # Get full name from user model
         full_name = f"{profile_user.first_name} {profile_user.last_name}".strip()
@@ -489,7 +532,7 @@ def api_people(request):
             # Build profile image URL if exists
             profile_image_url = None
             if profile.profile_image:
-                profile_image_url = request.build_absolute_uri(profile.profile_image.url)
+                profile_image_url = build_media_url(profile.profile_image.url if profile.profile_image else None, request)
             
             # Get full name
             full_name = f"{user.first_name} {user.last_name}".strip()
@@ -601,40 +644,53 @@ def api_offers(request):
             # Serialize offers
             offers_data = []
             for offer in offers:
-                # Build image URL if image exists
-                image_url = None
-                if offer.image:
-                    image_url = request.build_absolute_uri(offer.image.url)
-                
-                # Serialize tags
-                tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
-                
-                offer_data = {
-                    'id': offer.id,
-                    'user': {
-                        'id': offer.user.id,
-                        'username': offer.user.username,
-                        'email': offer.user.email or '',
-                    },
-                    'title': offer.title,
-                    'description': offer.description,
-                    'location': offer.location or '',
-                    'latitude': str(offer.latitude) if offer.latitude else None,
-                    'longitude': str(offer.longitude) if offer.longitude else None,
-                    'status': offer.status,
-                    'tags': tags_data,
-                    'is_reciprocal': offer.is_reciprocal,
-                    'contact_preference': offer.contact_preference,
-                    'created_at': offer.created_at.isoformat(),
-                    'updated_at': offer.updated_at.isoformat(),
-                    'expires_at': offer.expires_at.isoformat() if offer.expires_at else None,
-                    'image': image_url,
-                    'frequency': offer.frequency or '',
-                    'duration': offer.duration or '',
-                    'min_people': offer.min_people,
-                    'max_people': offer.max_people,
-                }
-                offers_data.append(offer_data)
+                try:
+                    # Build image URL if image exists
+                    image_url = None
+                    if offer.image:
+                        try:
+                            image_url = build_media_url(offer.image.url if offer.image else None, request)
+                        except Exception as img_error:
+                            print(f"Error building image URL for offer {offer.id}: {img_error}")
+                            image_url = None
+                    
+                    # Serialize tags
+                    tags_data = []
+                    try:
+                        tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
+                    except Exception as tag_error:
+                        print(f"Error serializing tags for offer {offer.id}: {tag_error}")
+                        tags_data = []
+                    
+                    offer_data = {
+                        'id': offer.id,
+                        'user': {
+                            'id': offer.user.id,
+                            'username': offer.user.username,
+                            'email': offer.user.email or '',
+                        },
+                        'title': offer.title,
+                        'description': offer.description,
+                        'location': offer.location or '',
+                        'latitude': str(offer.latitude) if offer.latitude else None,
+                        'longitude': str(offer.longitude) if offer.longitude else None,
+                        'status': offer.status,
+                        'tags': tags_data,
+                        'is_reciprocal': offer.is_reciprocal,
+                        'contact_preference': offer.contact_preference,
+                        'created_at': offer.created_at.isoformat(),
+                        'updated_at': offer.updated_at.isoformat(),
+                        'expires_at': offer.expires_at.isoformat() if offer.expires_at else None,
+                        'image': image_url,
+                        'frequency': offer.frequency or '',
+                        'duration': offer.duration or '',
+                        'min_people': offer.min_people,
+                        'max_people': offer.max_people,
+                    }
+                    offers_data.append(offer_data)
+                except Exception as offer_error:
+                    print(f"Error serializing offer {offer.id}: {offer_error}")
+                    continue
             
             response = JsonResponse({
                 'offers': offers_data,
@@ -645,9 +701,17 @@ def api_offers(request):
             return response
             
         except Exception as e:
-            return JsonResponse({
-                'message': f'Failed to retrieve offers: {str(e)}'
+            import traceback
+            print(f"Error in api_offers GET: {str(e)}")
+            print(traceback.format_exc())
+            response = JsonResponse({
+                'message': f'Failed to retrieve offers: {str(e)}',
+                'offers': [],
+                'count': 0
             }, status=500)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
     
     # Handle POST request - create offer
     # Authenticate user
@@ -769,6 +833,15 @@ def api_offers(request):
         if min_people_int and max_people_int and min_people_int > max_people_int:
             errors['min_people'] = ['Minimum people cannot be greater than maximum people.']
         
+        # Validate image - ensure it's a file upload, not a URL string
+        if image is not None:
+            # Check if image is actually a file object (from request.FILES)
+            # If it's a string, it means someone tried to pass a URL, which we don't support
+            if not hasattr(image, 'read') and not hasattr(image, 'file'):
+                # It's not a file object - could be a string/URL
+                errors['image'] = ['Image must be a file upload. External URLs are not supported.']
+                image = None  # Don't try to save it
+        
         if errors:
             # Format error message for frontend
             error_messages = []
@@ -877,7 +950,7 @@ def api_offer_detail(request, offer_id):
             # Build image URL if image exists
             image_url = None
             if offer.image:
-                image_url = request.build_absolute_uri(offer.image.url)
+                            image_url = build_media_url(offer.image.url if offer.image else None, request)
             
             # Serialize tags
             tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
@@ -950,32 +1023,115 @@ def api_offer_detail(request, offer_id):
             min_people = None
             max_people = None
             
-            if 'multipart/form-data' in content_type:
-                # Try to get from request.POST and request.FILES
-                if hasattr(request, 'POST') and request.POST:
-                    title = request.POST.get('title', None)
-                    description = request.POST.get('description', None)
-                    location = request.POST.get('location', None)
-                    tag_names = request.POST.getlist('tags') or []
-                    frequency = request.POST.get('frequency', None)
-                    duration = request.POST.get('duration', None)
-                    # Accept both minPeople/min_people and maxPeople/max_people
-                    min_people_str = request.POST.get('minPeople') or request.POST.get('min_people', None)
-                    max_people_str = request.POST.get('maxPeople') or request.POST.get('max_people', None)
+            # Check if this is a multipart request (FormData with file upload)
+            is_multipart = 'multipart/form-data' in content_type or (hasattr(request, 'FILES') and request.FILES)
+            
+            if is_multipart:
+                # For PUT/PATCH with multipart, Django may not populate request.POST automatically
+                # We need to manually parse multipart data for PUT/PATCH requests
+                if request.method in ['PUT', 'PATCH'] and not (hasattr(request, 'POST') and request.POST):
+                    # For PUT/PATCH, Django may have parsed FILES but not POST
+                    # Check FILES first (Django usually parses this)
+                    if hasattr(request, 'FILES') and request.FILES:
+                        image = request.FILES.get('image', None)
                     
-                    if min_people_str:
-                        try:
-                            min_people = int(min_people_str)
-                        except ValueError:
-                            min_people = None
-                    if max_people_str:
-                        try:
-                            max_people = int(max_people_str)
-                        except ValueError:
-                            max_people = None
-                
-                if hasattr(request, 'FILES') and request.FILES:
-                    image = request.FILES.get('image', None)
+                    # Try to manually parse multipart form data for POST fields
+                    # Note: This is a workaround - Django doesn't parse PUT/PATCH multipart into POST
+                    try:
+                        from django.http.multipartparser import MultiPartParser
+                        from django.core.files.uploadhandler import TemporaryFileUploadHandler
+                        from io import BytesIO
+                        
+                        # Get the raw body - need to read it if not already read
+                        if hasattr(request, '_body'):
+                            body = request._body
+                        else:
+                            body = request.body
+                        
+                        # Create a file-like object from the body
+                        body_file = BytesIO(body)
+                        
+                        # Create parser - MultiPartParser needs the boundary from Content-Type
+                        boundary = None
+                        content_type_header = request.META.get('CONTENT_TYPE', '')
+                        if 'boundary=' in content_type_header:
+                            boundary = content_type_header.split('boundary=')[1].strip()
+                        
+                        if boundary:
+                            # Parse the multipart data
+                            parser = MultiPartParser(request.META, body_file, [TemporaryFileUploadHandler(request)], boundary)
+                            parsed_data, parsed_files = parser.parse()
+                            
+                            # Extract data from parsed multipart
+                            if parsed_data.get('title'):
+                                title = parsed_data.get('title')[0] if isinstance(parsed_data.get('title'), list) else parsed_data.get('title')
+                            if parsed_data.get('description'):
+                                description = parsed_data.get('description')[0] if isinstance(parsed_data.get('description'), list) else parsed_data.get('description')
+                            if parsed_data.get('location'):
+                                location = parsed_data.get('location')[0] if isinstance(parsed_data.get('location'), list) else parsed_data.get('location')
+                            tag_names = parsed_data.getlist('tags') if hasattr(parsed_data, 'getlist') else (parsed_data.get('tags', []) if isinstance(parsed_data.get('tags'), list) else [parsed_data.get('tags')] if parsed_data.get('tags') else [])
+                            if parsed_data.get('frequency'):
+                                frequency = parsed_data.get('frequency')[0] if isinstance(parsed_data.get('frequency'), list) else parsed_data.get('frequency')
+                            if parsed_data.get('duration'):
+                                duration = parsed_data.get('duration')[0] if isinstance(parsed_data.get('duration'), list) else parsed_data.get('duration')
+                            
+                            min_people_str = None
+                            if parsed_data.get('minPeople'):
+                                min_people_str = parsed_data.get('minPeople')[0] if isinstance(parsed_data.get('minPeople'), list) else parsed_data.get('minPeople')
+                            elif parsed_data.get('min_people'):
+                                min_people_str = parsed_data.get('min_people')[0] if isinstance(parsed_data.get('min_people'), list) else parsed_data.get('min_people')
+                            
+                            max_people_str = None
+                            if parsed_data.get('maxPeople'):
+                                max_people_str = parsed_data.get('maxPeople')[0] if isinstance(parsed_data.get('maxPeople'), list) else parsed_data.get('maxPeople')
+                            elif parsed_data.get('max_people'):
+                                max_people_str = parsed_data.get('max_people')[0] if isinstance(parsed_data.get('max_people'), list) else parsed_data.get('max_people')
+                            
+                            if min_people_str:
+                                try:
+                                    min_people = int(min_people_str)
+                                except (ValueError, TypeError):
+                                    min_people = None
+                            if max_people_str:
+                                try:
+                                    max_people = int(max_people_str)
+                                except (ValueError, TypeError):
+                                    max_people = None
+                            
+                            # Get image from parsed files if not already set
+                            if not image and parsed_files:
+                                image = parsed_files.get('image', None)
+                    except Exception as e:
+                        print(f"Error parsing multipart data for PUT/PATCH: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # If parsing fails, at least try to get image from FILES if available
+                        if not image and hasattr(request, 'FILES') and request.FILES:
+                            image = request.FILES.get('image', None)
+                else:
+                    # For POST requests or if POST is already populated, use standard approach
+                    if hasattr(request, 'FILES') and request.FILES:
+                        image = request.FILES.get('image', None)
+                    if hasattr(request, 'POST') and request.POST:
+                        title = request.POST.get('title', None)
+                        description = request.POST.get('description', None)
+                        location = request.POST.get('location', None)
+                        tag_names = request.POST.getlist('tags') or []
+                        frequency = request.POST.get('frequency', None)
+                        duration = request.POST.get('duration', None)
+                        min_people_str = request.POST.get('minPeople') or request.POST.get('min_people', None)
+                        max_people_str = request.POST.get('maxPeople') or request.POST.get('max_people', None)
+                        
+                        if min_people_str:
+                            try:
+                                min_people = int(min_people_str)
+                            except ValueError:
+                                min_people = None
+                        if max_people_str:
+                            try:
+                                max_people = int(max_people_str)
+                            except ValueError:
+                                max_people = None
             else:
                 # Handle JSON (preferred method, used when no image is being uploaded)
                 try:
@@ -1039,6 +1195,15 @@ def api_offer_detail(request, offer_id):
                 offer.location = location
             
             if image is not None:
+                # Validate that image is actually a file object, not a URL string
+                if not hasattr(image, 'read') and not hasattr(image, 'file'):
+                    response = JsonResponse({
+                        'errors': {'image': ['Image must be a file upload. External URLs are not supported.']},
+                        'message': 'Image must be a file upload. External URLs are not supported.'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
                 offer.image = image
             
             if frequency is not None:
@@ -1070,7 +1235,7 @@ def api_offer_detail(request, offer_id):
             # Build image URL if image exists
             image_url = None
             if offer.image:
-                image_url = request.build_absolute_uri(offer.image.url)
+                            image_url = build_media_url(offer.image.url if offer.image else None, request)
             
             # Serialize tags
             tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
@@ -1167,36 +1332,49 @@ def api_needs(request):
             # Serialize needs
             needs_data = []
             for need in needs:
-                # Build image URL if image exists
-                image_url = None
-                if need.image:
-                    image_url = request.build_absolute_uri(need.image.url)
-                
-                # Serialize tags
-                tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
-                
-                need_data = {
-                    'id': need.id,
-                    'user': {
-                        'id': need.user.id,
-                        'username': need.user.username,
-                        'email': need.user.email or '',
-                    },
-                    'title': need.title,
-                    'description': need.description,
-                    'location': need.location or '',
-                    'latitude': str(need.latitude) if need.latitude else None,
-                    'longitude': str(need.longitude) if need.longitude else None,
-                    'status': need.status,
-                    'tags': tags_data,
-                    'contact_preference': need.contact_preference,
-                    'created_at': need.created_at.isoformat(),
-                    'updated_at': need.updated_at.isoformat(),
-                    'expires_at': need.expires_at.isoformat() if need.expires_at else None,
-                    'image': image_url,
-                    'duration': need.duration or '',
-                }
-                needs_data.append(need_data)
+                try:
+                    # Build image URL if image exists
+                    image_url = None
+                    if need.image:
+                        try:
+                            image_url = build_media_url(need.image.url if need.image else None, request)
+                        except Exception as img_error:
+                            print(f"Error building image URL for need {need.id}: {img_error}")
+                            image_url = None
+                    
+                    # Serialize tags
+                    tags_data = []
+                    try:
+                        tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
+                    except Exception as tag_error:
+                        print(f"Error serializing tags for need {need.id}: {tag_error}")
+                        tags_data = []
+                    
+                    need_data = {
+                        'id': need.id,
+                        'user': {
+                            'id': need.user.id,
+                            'username': need.user.username,
+                            'email': need.user.email or '',
+                        },
+                        'title': need.title,
+                        'description': need.description,
+                        'location': need.location or '',
+                        'latitude': str(need.latitude) if need.latitude else None,
+                        'longitude': str(need.longitude) if need.longitude else None,
+                        'status': need.status,
+                        'tags': tags_data,
+                        'contact_preference': need.contact_preference,
+                        'created_at': need.created_at.isoformat(),
+                        'updated_at': need.updated_at.isoformat(),
+                        'expires_at': need.expires_at.isoformat() if need.expires_at else None,
+                        'image': image_url,
+                        'duration': need.duration or '',
+                    }
+                    needs_data.append(need_data)
+                except Exception as need_error:
+                    print(f"Error serializing need {need.id}: {need_error}")
+                    continue
             
             response = JsonResponse({
                 'needs': needs_data,
@@ -1207,9 +1385,17 @@ def api_needs(request):
             return response
             
         except Exception as e:
-            return JsonResponse({
-                'message': f'Failed to retrieve needs: {str(e)}'
+            import traceback
+            print(f"Error in api_needs GET: {str(e)}")
+            print(traceback.format_exc())
+            response = JsonResponse({
+                'message': f'Failed to retrieve needs: {str(e)}',
+                'needs': [],
+                'count': 0
             }, status=500)
+            response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
     
     # Handle POST request - create need
     # Authenticate user
@@ -1394,7 +1580,7 @@ def api_need_detail(request, need_id):
             # Build image URL if image exists
             image_url = None
             if need.image:
-                image_url = request.build_absolute_uri(need.image.url)
+                            image_url = build_media_url(need.image.url if need.image else None, request)
             
             # Serialize tags
             tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
@@ -1461,19 +1647,75 @@ def api_need_detail(request, need_id):
             duration = None
             tag_names = []
             
-            if 'multipart/form-data' in content_type:
-                # Try to get from request.POST and request.FILES
-                # Note: For PUT requests, Django may not populate these automatically
-                # This may require middleware or manual parsing
-                if hasattr(request, 'POST') and request.POST:
-                    title = request.POST.get('title', None)
-                    description = request.POST.get('description', None)
-                    location = request.POST.get('location', None)
-                    duration = request.POST.get('duration', None)
-                    tag_names = request.POST.getlist('tags') or []
-                
-                if hasattr(request, 'FILES') and request.FILES:
-                    image = request.FILES.get('image', None)
+            # Check if this is a multipart request (FormData with file upload)
+            is_multipart = 'multipart/form-data' in content_type or (hasattr(request, 'FILES') and request.FILES)
+            
+            if is_multipart:
+                # For PUT/PATCH with multipart, Django may not populate request.POST automatically
+                # We need to manually parse multipart data for PUT/PATCH requests
+                if request.method in ['PUT', 'PATCH'] and not (hasattr(request, 'POST') and request.POST):
+                    # For PUT/PATCH, Django may have parsed FILES but not POST
+                    # Check FILES first (Django usually parses this)
+                    if hasattr(request, 'FILES') and request.FILES:
+                        image = request.FILES.get('image', None)
+                    
+                    # Try to manually parse multipart form data for POST fields
+                    try:
+                        from django.http.multipartparser import MultiPartParser
+                        from django.core.files.uploadhandler import TemporaryFileUploadHandler
+                        from io import BytesIO
+                        
+                        # Get the raw body
+                        if hasattr(request, '_body'):
+                            body = request._body
+                        else:
+                            body = request.body
+                        
+                        # Create a file-like object from the body
+                        body_file = BytesIO(body)
+                        
+                        # Get boundary from Content-Type
+                        boundary = None
+                        content_type_header = request.META.get('CONTENT_TYPE', '')
+                        if 'boundary=' in content_type_header:
+                            boundary = content_type_header.split('boundary=')[1].strip()
+                        
+                        if boundary:
+                            # Parse the multipart data
+                            parser = MultiPartParser(request.META, body_file, [TemporaryFileUploadHandler(request)], boundary)
+                            parsed_data, parsed_files = parser.parse()
+                            
+                            # Extract data from parsed multipart
+                            if parsed_data.get('title'):
+                                title = parsed_data.get('title')[0] if isinstance(parsed_data.get('title'), list) else parsed_data.get('title')
+                            if parsed_data.get('description'):
+                                description = parsed_data.get('description')[0] if isinstance(parsed_data.get('description'), list) else parsed_data.get('description')
+                            if parsed_data.get('location'):
+                                location = parsed_data.get('location')[0] if isinstance(parsed_data.get('location'), list) else parsed_data.get('location')
+                            if parsed_data.get('duration'):
+                                duration = parsed_data.get('duration')[0] if isinstance(parsed_data.get('duration'), list) else parsed_data.get('duration')
+                            tag_names = parsed_data.getlist('tags') if hasattr(parsed_data, 'getlist') else (parsed_data.get('tags', []) if isinstance(parsed_data.get('tags'), list) else [parsed_data.get('tags')] if parsed_data.get('tags') else [])
+                            
+                            # Get image from parsed files if not already set
+                            if not image and parsed_files:
+                                image = parsed_files.get('image', None)
+                    except Exception as e:
+                        print(f"Error parsing multipart data for PUT/PATCH: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # If parsing fails, at least try to get image from FILES if available
+                        if not image and hasattr(request, 'FILES') and request.FILES:
+                            image = request.FILES.get('image', None)
+                else:
+                    # For POST requests or if POST is already populated, use standard approach
+                    if hasattr(request, 'FILES') and request.FILES:
+                        image = request.FILES.get('image', None)
+                    if hasattr(request, 'POST') and request.POST:
+                        title = request.POST.get('title', None)
+                        description = request.POST.get('description', None)
+                        location = request.POST.get('location', None)
+                        duration = request.POST.get('duration', None)
+                        tag_names = request.POST.getlist('tags') or []
             else:
                 # Handle JSON (preferred method, used when no image is being uploaded)
                 try:
@@ -1532,6 +1774,15 @@ def api_need_detail(request, need_id):
                 need.duration = duration
             
             if image is not None:
+                # Validate that image is actually a file object, not a URL string
+                if not hasattr(image, 'read') and not hasattr(image, 'file'):
+                    response = JsonResponse({
+                        'errors': {'image': ['Image must be a file upload. External URLs are not supported.']},
+                        'message': 'Image must be a file upload. External URLs are not supported.'
+                    }, status=400)
+                    response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
                 need.image = image
             
             need.save()
@@ -1551,7 +1802,7 @@ def api_need_detail(request, need_id):
             # Build image URL if image exists
             image_url = None
             if need.image:
-                image_url = request.build_absolute_uri(need.image.url)
+                            image_url = build_media_url(need.image.url if need.image else None, request)
             
             # Serialize tags
             tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
@@ -1666,7 +1917,7 @@ def api_conversations(request):
                         }
                     )
                     profile_data = {
-                        'profile_image': profile.profile_image.url if profile.profile_image else None,
+                        'profile_image': build_media_url(profile.profile_image.url if profile.profile_image else None, request),
                         'bio': profile.bio or '',
                         'rank': profile.rank or 'newbee',
                         'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
@@ -1748,7 +1999,7 @@ def api_conversations(request):
                     }
                 )
                 profile_data = {
-                    'profile_image': profile.profile_image.url if profile.profile_image else None,
+                    'profile_image': build_media_url(profile.profile_image.url if profile.profile_image else None, request),
                     'bio': profile.bio or '',
                     'rank': profile.rank or 'newbee',
                     'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
@@ -1833,7 +2084,7 @@ def api_conversations(request):
                         }
                     )
                     profile_data = {
-                        'profile_image': profile.profile_image.url if profile.profile_image else None,
+                        'profile_image': build_media_url(profile.profile_image.url if profile.profile_image else None, request),
                         'bio': profile.bio or '',
                         'rank': profile.rank or 'newbee',
                         'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
@@ -1915,7 +2166,7 @@ def api_conversations(request):
                     }
                 )
                 profile_data = {
-                    'profile_image': profile.profile_image.url if profile.profile_image else None,
+                    'profile_image': build_media_url(profile.profile_image.url if profile.profile_image else None, request),
                     'bio': profile.bio or '',
                     'rank': profile.rank or 'newbee',
                     'rank_display': profile.get_rank_display() if hasattr(profile, 'get_rank_display') else 'New Bee',
@@ -2237,7 +2488,7 @@ def api_map_view(request):
                 # Build image URL if image exists
                 image_url = None
                 if offer.image:
-                    image_url = request.build_absolute_uri(offer.image.url)
+                    image_url = build_media_url(offer.image.url if offer.image else None, request)
                 
                 # Serialize tags
                 tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
@@ -2274,7 +2525,7 @@ def api_map_view(request):
                 # Build image URL if image exists
                 image_url = None
                 if need.image:
-                    image_url = request.build_absolute_uri(need.image.url)
+                    image_url = build_media_url(need.image.url if need.image else None, request)
                 
                 # Serialize tags
                 tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]

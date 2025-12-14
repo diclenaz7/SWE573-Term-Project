@@ -21,9 +21,7 @@ function LocationMarker({ position, setPosition }) {
     },
   });
 
-  return position === null ? null : (
-    <Marker position={position}></Marker>
-  );
+  return position === null ? null : <Marker position={position}></Marker>;
 }
 
 function LocationSearch({ onLocationSelect, initialLocation = null }) {
@@ -42,7 +40,11 @@ function LocationSearch({ onLocationSelect, initialLocation = null }) {
   const resultsRef = useRef(null);
 
   useEffect(() => {
-    if (initialLocation && initialLocation.latitude && initialLocation.longitude) {
+    if (
+      initialLocation &&
+      initialLocation.latitude &&
+      initialLocation.longitude
+    ) {
       setMapCenter([initialLocation.latitude, initialLocation.longitude]);
       setMapPosition([initialLocation.latitude, initialLocation.longitude]);
       setSearchQuery(initialLocation.address || "");
@@ -89,7 +91,9 @@ function LocationSearch({ onLocationSelect, initialLocation = null }) {
     try {
       // Using Nominatim (OpenStreetMap's geocoding service)
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query
+        )}&limit=5&addressdetails=1`,
         {
           headers: {
             "User-Agent": "TheHiveApp/1.0",
@@ -182,7 +186,9 @@ function LocationSearch({ onLocationSelect, initialLocation = null }) {
           handleMapClick(lat, lng);
         },
         (error) => {
-          alert("Unable to get your location. Please search for a location or click on the map.");
+          alert(
+            "Unable to get your location. Please search for a location or click on the map."
+          );
         }
       );
     } else {
@@ -216,7 +222,7 @@ function LocationSearch({ onLocationSelect, initialLocation = null }) {
         >
           📍
         </button>
-        
+
         {/* Search Results Dropdown */}
         {showResults && searchResults.length > 0 && (
           <div className="location-search-results" ref={resultsRef}>
@@ -226,10 +232,15 @@ function LocationSearch({ onLocationSelect, initialLocation = null }) {
                 className="location-search-result-item"
                 onClick={() => handleSelectLocation(result)}
               >
-                <div className="location-result-name">{result.display_name}</div>
+                <div className="location-result-name">
+                  {result.display_name}
+                </div>
                 {result.address && (
                   <div className="location-result-details">
-                    {result.address.city || result.address.town || result.address.village || ""}
+                    {result.address.city ||
+                      result.address.town ||
+                      result.address.village ||
+                      ""}
                     {result.address.country && `, ${result.address.country}`}
                   </div>
                 )}
@@ -274,4 +285,3 @@ function LocationSearch({ onLocationSelect, initialLocation = null }) {
 }
 
 export default LocationSearch;
-

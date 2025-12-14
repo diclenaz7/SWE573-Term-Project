@@ -21,9 +21,7 @@ function LocationMarker({ position, setPosition }) {
     },
   });
 
-  return position === null ? null : (
-    <Marker position={position}></Marker>
-  );
+  return position === null ? null : <Marker position={position}></Marker>;
 }
 
 function LocationPicker({ onLocationSelect, initialLat, initialLng }) {
@@ -95,7 +93,9 @@ function LocationPicker({ onLocationSelect, initialLat, initialLng }) {
           reverseGeocode(userPos[0], userPos[1]);
         },
         (error) => {
-          alert("Unable to get your location. Please select a location on the map.");
+          alert(
+            "Unable to get your location. Please select a location on the map."
+          );
         }
       );
     } else {
@@ -140,4 +140,3 @@ function LocationPicker({ onLocationSelect, initialLat, initialLng }) {
 }
 
 export default LocationPicker;
-

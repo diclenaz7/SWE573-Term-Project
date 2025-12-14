@@ -234,6 +234,13 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Base URL for building absolute URLs for media files
+# This should be set via environment variable in production
+# Falls back to request-based URL in development if not set
+BASE_URL = os.environ.get('BASE_URL', None)
+if BASE_URL and not BASE_URL.endswith('/'):
+    BASE_URL = BASE_URL + '/'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
