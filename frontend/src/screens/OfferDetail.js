@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Header from "../components/common/header";
+import Map from "../components/common/Map";
 import "./OfferDetail.css";
 import { BASE_URL } from "../constants";
 import { getAuthHeaders, getToken, removeToken } from "../utils/auth";
@@ -731,12 +732,17 @@ function OfferDetail() {
                 )}
                 {offer.latitude && offer.longitude && (
                   <div className="offer-detail-map">
-                    <div className="map-view-placeholder">
-                      <p className="map-view-label">Map View</p>
-                      <p className="map-view-note">
-                        Map integration coming soon
-                      </p>
-                    </div>
+                    <h3 className="map-section-title">Location</h3>
+                    <Map
+                      singleItem={{
+                        ...offer,
+                        type: "offer",
+                        latitude: offer.latitude,
+                        longitude: offer.longitude,
+                      }}
+                      height="300px"
+                      showInfoCard={false}
+                    />
                   </div>
                 )}
                 <div className="offer-detail-actions">

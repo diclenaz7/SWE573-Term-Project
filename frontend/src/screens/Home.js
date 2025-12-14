@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/common/header";
 import FeedCard from "../components/feed/FeedCard";
+import Map from "../components/common/Map";
 import "./Home.css";
 import { BASE_URL } from "../constants";
 import { getAuthHeaders, removeToken } from "../utils/auth";
@@ -14,6 +15,8 @@ function Home() {
   const [needs, setNeeds] = useState([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [loadingNeeds, setLoadingNeeds] = useState(false);
+  const [mapOffers, setMapOffers] = useState([]);
+  const [mapNeeds, setMapNeeds] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,8 +27,15 @@ function Home() {
     if (user) {
       fetchOffers();
       fetchNeeds();
+      fetchMapData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchMapData();
+    }
+  }, [activeTab]);
 
   const fetchUser = async () => {
     try {
@@ -120,6 +130,39 @@ function Home() {
     }
   };
 
+  const fetchMapData = async () => {
+    try {
+      // Determine filters based on activeTab
+      let filters = [];
+      if (activeTab === "All") {
+        filters = ["offers", "needs"];
+      } else if (activeTab === "Offers") {
+        filters = ["offers"];
+      } else if (activeTab === "Needs") {
+        filters = ["needs"];
+      }
+
+      const response = await fetch(`${BASE_URL}/api/map-view/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ filters }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMapOffers(data.offers || []);
+        setMapNeeds(data.needs || []);
+      } else {
+        console.error("Failed to fetch map data");
+      }
+    } catch (error) {
+      console.error("Error fetching map data:", error);
+    }
+  };
+
   // Filter feed items based on active tab
   const filteredFeed = useMemo(() => {
     if (!user) return [];
@@ -199,10 +242,19 @@ function Home() {
               </section>
 
               <section className="map-view-section">
-                <div className="map-view-placeholder">
-                  <p className="map-view-label">Map View</p>
-                  <p className="map-view-note">Map integration coming soon</p>
-                </div>
+                <Map
+                  offers={mapOffers}
+                  needs={mapNeeds}
+                  filters={
+                    activeTab === "All"
+                      ? ["offers", "needs"]
+                      : activeTab === "Offers"
+                      ? ["offers"]
+                      : ["needs"]
+                  }
+                  height="400px"
+                  showInfoCard={true}
+                />
               </section>
 
               {/* Feed Section */}

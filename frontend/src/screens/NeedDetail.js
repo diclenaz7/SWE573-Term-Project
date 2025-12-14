@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Header from "../components/common/header";
+import Map from "../components/common/Map";
 import "./NeedDetail.css";
 import { BASE_URL } from "../constants";
 import { getAuthHeaders, getToken, removeToken } from "../utils/auth";
@@ -602,12 +603,17 @@ function NeedDetail() {
                 )}
                 {need.latitude && need.longitude && (
                   <div className="need-detail-map">
-                    <div className="map-view-placeholder">
-                      <p className="map-view-label">Map View</p>
-                      <p className="map-view-note">
-                        Map integration coming soon
-                      </p>
-                    </div>
+                    <h3 className="map-section-title">Location</h3>
+                    <Map
+                      singleItem={{
+                        ...need,
+                        type: "need",
+                        latitude: need.latitude,
+                        longitude: need.longitude,
+                      }}
+                      height="300px"
+                      showInfoCard={false}
+                    />
                   </div>
                 )}
                 <div className="need-detail-actions">

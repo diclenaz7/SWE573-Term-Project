@@ -672,6 +672,10 @@ def api_offers(request):
             duration = request.POST.get('duration', '')
             min_people = request.POST.get('minPeople', '')
             max_people = request.POST.get('maxPeople', '')
+            
+            # Get latitude and longitude
+            latitude = request.POST.get('latitude', '')
+            longitude = request.POST.get('longitude', '')
         else:
             # Handle JSON (fallback for non-file uploads)
             body = json.loads(request.body)
@@ -690,6 +694,10 @@ def api_offers(request):
             duration = body.get('duration', '')
             min_people = body.get('minPeople', '')
             max_people = body.get('maxPeople', '')
+            
+            # Get latitude and longitude
+            latitude = body.get('latitude', '')
+            longitude = body.get('longitude', '')
         
         # Validate required fields
         errors = {}
@@ -757,12 +765,28 @@ def api_offers(request):
                 'message': ' '.join(error_messages) if error_messages else 'Validation failed.'
             }, status=400)
         
+        # Parse latitude and longitude if provided
+        latitude_decimal = None
+        longitude_decimal = None
+        if latitude:
+            try:
+                latitude_decimal = float(latitude)
+            except (ValueError, TypeError):
+                pass
+        if longitude:
+            try:
+                longitude_decimal = float(longitude)
+            except (ValueError, TypeError):
+                pass
+        
         # Create the offer
         offer = Offer.objects.create(
             user=user,
             title=title,
             description=description,
             location=location,
+            latitude=latitude_decimal,
+            longitude=longitude_decimal,
             image=image,  # Django ImageField handles None automatically
             frequency=frequency if frequency else '',
             duration=duration if duration else '',
@@ -1189,6 +1213,10 @@ def api_needs(request):
             image = request.FILES.get('image', None)
             duration = request.POST.get('duration', '')
             
+            # Get latitude and longitude
+            latitude = request.POST.get('latitude', '')
+            longitude = request.POST.get('longitude', '')
+            
             # Get tags (can be multiple)
             tag_names = request.POST.getlist('tags') or []
         else:
@@ -1199,6 +1227,10 @@ def api_needs(request):
             location = body.get('location', '')
             image = None  # Can't send files via JSON
             duration = body.get('duration', '')
+            
+            # Get latitude and longitude
+            latitude = body.get('latitude', '')
+            longitude = body.get('longitude', '')
             
             # Get tags (can be multiple)
             tag_names = body.get('tags', [])
@@ -1237,12 +1269,28 @@ def api_needs(request):
                 'message': ' '.join(error_messages) if error_messages else 'Validation failed.'
             }, status=400)
         
+        # Parse latitude and longitude if provided
+        latitude_decimal = None
+        longitude_decimal = None
+        if latitude:
+            try:
+                latitude_decimal = float(latitude)
+            except (ValueError, TypeError):
+                pass
+        if longitude:
+            try:
+                longitude_decimal = float(longitude)
+            except (ValueError, TypeError):
+                pass
+        
         # Create the need
         need = Need.objects.create(
             user=user,
             title=title,
             description=description,
             location=location,
+            latitude=latitude_decimal,
+            longitude=longitude_decimal,
             image=image,  # Django ImageField handles None automatically
             duration=duration,
         )
@@ -2108,6 +2156,138 @@ def api_conversation_messages(request, conversation_id):
     except Exception as e:
         response = JsonResponse({
             'message': f'Failed to fetch messages: {str(e)}'
+        }, status=500)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+def api_map_view(request):
+    """API endpoint for map view that accepts filter array and returns offers/needs with location data."""
+    # Handle OPTIONS preflight request for CORS
+    if request.method == "OPTIONS":
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    try:
+        # Parse request body
+        body = json.loads(request.body)
+        filters = body.get('filters', [])
+        
+        # Validate filters - should be an array containing "offers", "needs", or both
+        if not isinstance(filters, list):
+            return JsonResponse({
+                'message': 'Filters must be an array'
+            }, status=400)
+        
+        # Filter out invalid values
+        valid_filters = [f for f in filters if f in ['offers', 'needs']]
+        
+        # If empty array or no valid filters, return both
+        if not valid_filters:
+            valid_filters = ['offers', 'needs']
+        
+        offers_data = []
+        needs_data = []
+        
+        # Get offers if requested
+        if 'offers' in valid_filters:
+            # Only get active offers with location data
+            offers = Offer.objects.filter(
+                status='active',
+                latitude__isnull=False,
+                longitude__isnull=False
+            ).select_related('user').prefetch_related('tags')
+            
+            for offer in offers:
+                # Build image URL if image exists
+                image_url = None
+                if offer.image:
+                    image_url = request.build_absolute_uri(offer.image.url)
+                
+                # Serialize tags
+                tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in offer.tags.all()]
+                
+                offers_data.append({
+                    'id': offer.id,
+                    'type': 'offer',
+                    'user': {
+                        'id': offer.user.id,
+                        'username': offer.user.username,
+                        'email': offer.user.email or '',
+                    },
+                    'title': offer.title,
+                    'description': offer.description,
+                    'location': offer.location or '',
+                    'latitude': float(offer.latitude),
+                    'longitude': float(offer.longitude),
+                    'status': offer.status,
+                    'tags': tags_data,
+                    'image': image_url,
+                    'created_at': offer.created_at.isoformat(),
+                })
+        
+        # Get needs if requested
+        if 'needs' in valid_filters:
+            # Only get open needs with location data
+            needs = Need.objects.filter(
+                status='open',
+                latitude__isnull=False,
+                longitude__isnull=False
+            ).select_related('user').prefetch_related('tags')
+            
+            for need in needs:
+                # Build image URL if image exists
+                image_url = None
+                if need.image:
+                    image_url = request.build_absolute_uri(need.image.url)
+                
+                # Serialize tags
+                tags_data = [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in need.tags.all()]
+                
+                needs_data.append({
+                    'id': need.id,
+                    'type': 'need',
+                    'user': {
+                        'id': need.user.id,
+                        'username': need.user.username,
+                        'email': need.user.email or '',
+                    },
+                    'title': need.title,
+                    'description': need.description,
+                    'location': need.location or '',
+                    'latitude': float(need.latitude),
+                    'longitude': float(need.longitude),
+                    'status': need.status,
+                    'tags': tags_data,
+                    'image': image_url,
+                    'created_at': need.created_at.isoformat(),
+                })
+        
+        response = JsonResponse({
+            'offers': offers_data,
+            'needs': needs_data,
+            'offers_count': len(offers_data),
+            'needs_count': len(needs_data),
+            'total_count': len(offers_data) + len(needs_data)
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'message': 'Invalid JSON in request body'
+        }, status=400)
+    except Exception as e:
+        response = JsonResponse({
+            'message': f'Failed to retrieve map data: {str(e)}'
         }, status=500)
         response["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
         response["Access-Control-Allow-Credentials"] = "true"

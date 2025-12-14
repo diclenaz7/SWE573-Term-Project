@@ -280,7 +280,15 @@
 
 .offer-detail-map {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.map-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
 }
 
 .map-view-placeholder {
