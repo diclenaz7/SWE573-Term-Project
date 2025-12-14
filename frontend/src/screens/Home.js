@@ -24,6 +24,10 @@ function Home() {
   });
   const navigate = useNavigate();
 
+  // Refs to track ongoing requests
+  const fetchingOffersRef = React.useRef(false);
+  const fetchingNeedsRef = React.useRef(false);
+
   useEffect(() => {
     fetchUser();
   }, []);
@@ -50,7 +54,6 @@ function Home() {
   useEffect(() => {
     if (!user) return;
 
-    // Use a ref to track if this is the initial mount
     const timeoutId = setTimeout(() => {
       fetchOffers();
       fetchNeeds();
@@ -59,6 +62,21 @@ function Home() {
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchFilters, user]);
+
+  // Safety mechanism: reset loading states if they're stuck for too long
+  useEffect(() => {
+    if (!user) return;
+
+    const timeoutId = setTimeout(() => {
+      if (loadingOffers || loadingNeeds) {
+        console.warn("Loading states stuck, resetting...");
+        setLoadingOffers(false);
+        setLoadingNeeds(false);
+      }
+    }, 30000); // 30 second timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [user, loadingOffers, loadingNeeds]);
 
   const fetchUser = async () => {
     try {
@@ -106,7 +124,15 @@ function Home() {
   };
 
   const fetchOffers = async () => {
+    // Prevent duplicate requests
+    if (fetchingOffersRef.current) {
+      console.log("Offers fetch already in progress, skipping...");
+      return;
+    }
+
+    fetchingOffersRef.current = true;
     setLoadingOffers(true);
+    console.log("Fetching offers...");
     try {
       const headers = getAuthHeaders();
       // Build query parameters
@@ -120,28 +146,63 @@ function Home() {
       }
 
       const url = `${BASE_URL}/api/offers/?${params.toString()}`;
+      console.log("Fetching offers from:", url);
+
+      // Add timeout to fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(url, {
         method: "GET",
         headers: headers,
         credentials: "include",
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+      console.log("Offers response status:", response.status);
+
       if (response.ok) {
-        const data = await response.json();
-        setOffers(data.offers || []);
+        try {
+          const data = await response.json();
+          console.log("Offers data received:", data);
+          setOffers(data.offers || []);
+        } catch (jsonError) {
+          console.error("Error parsing offers JSON:", jsonError);
+          setOffers([]);
+        }
       } else {
-        console.error("Failed to fetch offers", response.status);
+        console.error(
+          "Failed to fetch offers",
+          response.status,
+          response.statusText
+        );
         setOffers([]);
       }
     } catch (error) {
-      console.error("Error fetching offers:", error);
+      if (error.name === "AbortError") {
+        console.error("Fetch offers timeout - request took too long");
+      } else {
+        console.error("Error fetching offers:", error);
+      }
       setOffers([]);
     } finally {
+      console.log("Setting loadingOffers to false");
       setLoadingOffers(false);
+      fetchingOffersRef.current = false;
     }
   };
 
   const fetchNeeds = async () => {
+    // Prevent duplicate requests
+    if (fetchingNeedsRef.current) {
+      console.log("Needs fetch already in progress, skipping...");
+      return;
+    }
+
+    fetchingNeedsRef.current = true;
     setLoadingNeeds(true);
+    console.log("Fetching needs...");
     try {
       const headers = getAuthHeaders();
       // Build query parameters
@@ -155,23 +216,50 @@ function Home() {
       }
 
       const url = `${BASE_URL}/api/needs/?${params.toString()}`;
+      console.log("Fetching needs from:", url);
+
+      // Add timeout to fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(url, {
         method: "GET",
         headers: headers,
         credentials: "include",
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+      console.log("Needs response status:", response.status);
+
       if (response.ok) {
-        const data = await response.json();
-        setNeeds(data.needs || []);
+        try {
+          const data = await response.json();
+          console.log("Needs data received:", data);
+          setNeeds(data.needs || []);
+        } catch (jsonError) {
+          console.error("Error parsing needs JSON:", jsonError);
+          setNeeds([]);
+        }
       } else {
-        console.error("Failed to fetch needs", response.status);
+        console.error(
+          "Failed to fetch needs",
+          response.status,
+          response.statusText
+        );
         setNeeds([]);
       }
     } catch (error) {
-      console.error("Error fetching needs:", error);
+      if (error.name === "AbortError") {
+        console.error("Fetch needs timeout - request took too long");
+      } else {
+        console.error("Error fetching needs:", error);
+      }
       setNeeds([]);
     } finally {
+      console.log("Setting loadingNeeds to false");
       setLoadingNeeds(false);
+      fetchingNeedsRef.current = false;
     }
   };
 

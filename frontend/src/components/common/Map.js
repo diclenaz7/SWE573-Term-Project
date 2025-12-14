@@ -42,14 +42,14 @@ function MapController({ center, zoom }) {
   return null;
 }
 
-function Map({ 
-  offers = [], 
-  needs = [], 
+function Map({
+  offers = [],
+  needs = [],
   filters = ["offers", "needs"],
   height = "400px",
   showInfoCard = true,
   singleItem = null, // For detail pages - single offer or need
-  onMarkerClick = null
+  onMarkerClick = null,
 }) {
   const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState(singleItem);
@@ -61,8 +61,14 @@ function Map({
     if (singleItem) {
       setSelectedItem(singleItem);
       if (singleItem.latitude && singleItem.longitude) {
-        const lat = typeof singleItem.latitude === 'string' ? parseFloat(singleItem.latitude) : singleItem.latitude;
-        const lng = typeof singleItem.longitude === 'string' ? parseFloat(singleItem.longitude) : singleItem.longitude;
+        const lat =
+          typeof singleItem.latitude === "string"
+            ? parseFloat(singleItem.latitude)
+            : singleItem.latitude;
+        const lng =
+          typeof singleItem.longitude === "string"
+            ? parseFloat(singleItem.longitude)
+            : singleItem.longitude;
         setMapCenter([lat, lng]);
         setMapZoom(14);
       }
@@ -76,13 +82,17 @@ function Map({
     if (!singleItem && (offers.length > 0 || needs.length > 0)) {
       // Calculate center based on all markers
       const allItems = [
-        ...offers.filter(o => o.latitude && o.longitude),
-        ...needs.filter(n => n.latitude && n.longitude)
+        ...offers.filter((o) => o.latitude && o.longitude),
+        ...needs.filter((n) => n.latitude && n.longitude),
       ];
-      
+
       if (allItems.length > 0) {
-        const avgLat = allItems.reduce((sum, item) => sum + parseFloat(item.latitude), 0) / allItems.length;
-        const avgLng = allItems.reduce((sum, item) => sum + parseFloat(item.longitude), 0) / allItems.length;
+        const avgLat =
+          allItems.reduce((sum, item) => sum + parseFloat(item.latitude), 0) /
+          allItems.length;
+        const avgLng =
+          allItems.reduce((sum, item) => sum + parseFloat(item.longitude), 0) /
+          allItems.length;
         setMapCenter([avgLat, avgLng]);
         setMapZoom(12);
       }
@@ -163,7 +173,10 @@ function Map({
             return (
               <Marker
                 key={`offer-${offer.id}`}
-                position={[parseFloat(offer.latitude), parseFloat(offer.longitude)]}
+                position={[
+                  parseFloat(offer.latitude),
+                  parseFloat(offer.longitude),
+                ]}
                 icon={offerIcon}
                 eventHandlers={{
                   click: () => handleMarkerClick({ ...offer, type: "offer" }),
@@ -185,7 +198,10 @@ function Map({
             return (
               <Marker
                 key={`need-${need.id}`}
-                position={[parseFloat(need.latitude), parseFloat(need.longitude)]}
+                position={[
+                  parseFloat(need.latitude),
+                  parseFloat(need.longitude),
+                ]}
                 icon={needIcon}
                 eventHandlers={{
                   click: () => handleMarkerClick({ ...need, type: "need" }),
@@ -205,15 +221,27 @@ function Map({
           {singleItem && singleItem.latitude && singleItem.longitude && (
             <Marker
               position={[
-                typeof singleItem.latitude === 'string' ? parseFloat(singleItem.latitude) : singleItem.latitude,
-                typeof singleItem.longitude === 'string' ? parseFloat(singleItem.longitude) : singleItem.longitude
+                typeof singleItem.latitude === "string"
+                  ? parseFloat(singleItem.latitude)
+                  : singleItem.latitude,
+                typeof singleItem.longitude === "string"
+                  ? parseFloat(singleItem.longitude)
+                  : singleItem.longitude,
               ]}
-              icon={singleItem.type === "offer" || !singleItem.type ? offerIcon : needIcon}
+              icon={
+                singleItem.type === "offer" || !singleItem.type
+                  ? offerIcon
+                  : needIcon
+              }
             >
               <Popup>
                 <div className="marker-popup">
                   <h3>{singleItem.title}</h3>
-                  <p className="marker-type">{singleItem.type === "offer" || !singleItem.type ? "Offer" : "Need"}</p>
+                  <p className="marker-type">
+                    {singleItem.type === "offer" || !singleItem.type
+                      ? "Offer"
+                      : "Need"}
+                  </p>
                 </div>
               </Popup>
             </Marker>
@@ -237,10 +265,7 @@ function Map({
             {selectedItem.location && (
               <p className="info-card-location">📍 {selectedItem.location}</p>
             )}
-            <button
-              className="see-details-button"
-              onClick={handleSeeDetails}
-            >
+            <button className="see-details-button" onClick={handleSeeDetails}>
               See Details →
             </button>
           </div>
@@ -251,4 +276,3 @@ function Map({
 }
 
 export default Map;
-
