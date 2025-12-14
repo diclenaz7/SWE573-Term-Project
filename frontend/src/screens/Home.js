@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/common/header";
 import FeedCard from "../components/feed/FeedCard";
+import FeedSearch from "../components/feed/FeedSearch";
 import Map from "../components/common/Map";
 import "./Home.css";
 import { BASE_URL } from "../constants";
@@ -17,25 +18,47 @@ function Home() {
   const [loadingNeeds, setLoadingNeeds] = useState(false);
   const [mapOffers, setMapOffers] = useState([]);
   const [mapNeeds, setMapNeeds] = useState([]);
+  const [searchFilters, setSearchFilters] = useState({
+    text: "",
+    location: "",
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchUser();
   }, []);
 
+  // Initial load when user is set
   useEffect(() => {
     if (user) {
       fetchOffers();
       fetchNeeds();
       fetchMapData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Update map when tab changes
   useEffect(() => {
     if (user) {
       fetchMapData();
     }
-  }, [activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user]);
+
+  // Fetch offers and needs when search filters change (with debounce)
+  useEffect(() => {
+    if (!user) return;
+
+    // Use a ref to track if this is the initial mount
+    const timeoutId = setTimeout(() => {
+      fetchOffers();
+      fetchNeeds();
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchFilters, user]);
 
   const fetchUser = async () => {
     try {
@@ -86,7 +109,18 @@ function Home() {
     setLoadingOffers(true);
     try {
       const headers = getAuthHeaders();
-      const response = await fetch(`${BASE_URL}/api/offers/?status=active`, {
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append("status", "active");
+      if (searchFilters.text && searchFilters.text.trim()) {
+        params.append("search", searchFilters.text.trim());
+      }
+      if (searchFilters.location && searchFilters.location.trim()) {
+        params.append("location", searchFilters.location.trim());
+      }
+
+      const url = `${BASE_URL}/api/offers/?${params.toString()}`;
+      const response = await fetch(url, {
         method: "GET",
         headers: headers,
         credentials: "include",
@@ -95,7 +129,7 @@ function Home() {
         const data = await response.json();
         setOffers(data.offers || []);
       } else {
-        console.error("Failed to fetch offers");
+        console.error("Failed to fetch offers", response.status);
         setOffers([]);
       }
     } catch (error) {
@@ -110,7 +144,18 @@ function Home() {
     setLoadingNeeds(true);
     try {
       const headers = getAuthHeaders();
-      const response = await fetch(`${BASE_URL}/api/needs/?status=open`, {
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append("status", "open");
+      if (searchFilters.text && searchFilters.text.trim()) {
+        params.append("search", searchFilters.text.trim());
+      }
+      if (searchFilters.location && searchFilters.location.trim()) {
+        params.append("location", searchFilters.location.trim());
+      }
+
+      const url = `${BASE_URL}/api/needs/?${params.toString()}`;
+      const response = await fetch(url, {
         method: "GET",
         headers: headers,
         credentials: "include",
@@ -119,7 +164,7 @@ function Home() {
         const data = await response.json();
         setNeeds(data.needs || []);
       } else {
-        console.error("Failed to fetch needs");
+        console.error("Failed to fetch needs", response.status);
         setNeeds([]);
       }
     } catch (error) {
@@ -260,6 +305,14 @@ function Home() {
               {/* Feed Section */}
               <section className="feed-section">
                 <h2 className="feed-title">Feed</h2>
+                <FeedSearch
+                  onSearch={(filters) => {
+                    setSearchFilters(filters);
+                  }}
+                  onClear={() => {
+                    setSearchFilters({ text: "", location: "" });
+                  }}
+                />
                 <div className="feed-content">
                   {loadingOffers || loadingNeeds ? (
                     <div className="feed-item">

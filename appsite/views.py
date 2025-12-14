@@ -574,12 +574,26 @@ def api_offers(request):
         try:
             # Get query parameters for filtering
             status = request.GET.get('status', 'active')
+            search_text = request.GET.get('search', '').strip()
+            search_location = request.GET.get('location', '').strip()
             
             # Filter offers by status (default to active)
             if status == 'all':
                 offers = Offer.objects.all().select_related('user').prefetch_related('tags')
             else:
                 offers = Offer.objects.filter(status=status).select_related('user').prefetch_related('tags')
+            
+            # Text search - search in title, description, and tags
+            if search_text:
+                offers = offers.filter(
+                    Q(title__icontains=search_text) | 
+                    Q(description__icontains=search_text) |
+                    Q(tags__name__icontains=search_text)
+                ).distinct()
+            
+            # Location search - search in location field
+            if search_location:
+                offers = offers.filter(location__icontains=search_location)
             
             # Order by creation date (newest first)
             offers = offers.order_by('-created_at')
@@ -1126,12 +1140,26 @@ def api_needs(request):
         try:
             # Get query parameters for filtering
             status = request.GET.get('status', 'open')
+            search_text = request.GET.get('search', '').strip()
+            search_location = request.GET.get('location', '').strip()
             
             # Filter needs by status (default to open)
             if status == 'all':
                 needs = Need.objects.all().select_related('user').prefetch_related('tags')
             else:
                 needs = Need.objects.filter(status=status).select_related('user').prefetch_related('tags')
+            
+            # Text search - search in title, description, and tags
+            if search_text:
+                needs = needs.filter(
+                    Q(title__icontains=search_text) | 
+                    Q(description__icontains=search_text) |
+                    Q(tags__name__icontains=search_text)
+                ).distinct()
+            
+            # Location search - search in location field
+            if search_location:
+                needs = needs.filter(location__icontains=search_location)
             
             # Order by creation date (newest first)
             needs = needs.order_by('-created_at')
