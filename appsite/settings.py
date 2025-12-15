@@ -25,7 +25,14 @@ SECRET_KEY = 'django-insecure-2+g-mi6*cqlyfgk7oy-+1x-3w6bwbrs)k2z#&5_g&-cp$kmi0e
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'django-app-494208442673.europe-west1.run.app']
+ALLOWED_HOSTS = [
+    'localhost', 
+    '127.0.0.1', 
+    'django-app-494208442673.europe-west1.run.app',
+    'django-app-gkihzbtmca-ew.a.run.app',
+    'react-frontend-494208442673.europe-west1.run.app',
+    'react-frontend-gkihzbtmca-ew.a.run.app',
+]
 
 
 # Application definition
@@ -57,14 +64,18 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://django-app-494208442673.europe-west1.run.app",
+    "https://django-app-gkihzbtmca-ew.a.run.app",
     "https://react-frontend-494208442673.europe-west1.run.app",
+    "https://react-frontend-gkihzbtmca-ew.a.run.app",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://django-app-494208442673.europe-west1.run.app",
+    "https://django-app-gkihzbtmca-ew.a.run.app",
     "https://react-frontend-494208442673.europe-west1.run.app",
+    "https://react-frontend-gkihzbtmca-ew.a.run.app",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

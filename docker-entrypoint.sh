@@ -52,6 +52,11 @@ echo "Running migrations..."
 python manage.py migrate --noinput
 echo "✓ Migrations completed"
 
+# Ensure database cache table exists (required for session/token cache)
+echo "Ensuring cache table exists..."
+python manage.py createcachetable cache_table || true
+echo "✓ Cache table ready"
+
 # Populate mock data if POPULATE_MOCK_DATA is set to true
 if [ "$POPULATE_MOCK_DATA" = "true" ]; then
   echo "Populating database with mock data..."
