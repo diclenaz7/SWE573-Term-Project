@@ -7,13 +7,21 @@ ENV PYTHONUNBUFFERED=1
 
 # install deps
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --no-cache-dir -r requirements.txt
 
 # copy project
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Cloud Run will set PORT
 ENV PORT=8000
 
+# Set entrypoint (use the script from the app directory)
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
 # Django DB will come from env vars, see below
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT appsite.wsgi:application"]
+# Default command (can be overridden in docker-compose)
+# Use daphne for ASGI/WebSocket support
+CMD ["sh", "-c", "daphne -b 0.0.0.0 -p $PORT appsite.asgi:application"]

@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
@@ -24,5 +26,20 @@ urlpatterns = [
     path('api/auth/logout/', views.api_logout, name='api_logout'),
     path('api/auth/register/', views.api_register, name='api_register'),
     path('api/auth/user/', views.api_user, name='api_user'),
+    path('api/profile/', views.api_profile, name='api_profile'),  # GET for retrieving current user, PATCH/PUT for updating
+    path('api/profile/<int:user_id>/', views.api_profile, name='api_profile_user'),  # GET for retrieving specific user's profile
+    path('api/people/', views.api_people, name='api_people'),  # GET for listing all users with search
     path('api/hello/', views.hello_api, name='hello_api'),
+    path('api/offers/', views.api_offers, name='api_offers'),  # GET for listing, POST for creating
+    path('api/offers/<int:offer_id>/', views.api_offer_detail, name='api_offer_detail'),  # GET for single offer, PUT/PATCH for updating
+    path('api/needs/', views.api_needs, name='api_needs'),  # GET for listing, POST for creating
+    path('api/needs/<int:need_id>/', views.api_need_detail, name='api_need_detail'),  # GET for single need, PUT/PATCH for updating
+    path('api/conversations/', views.api_conversations, name='api_conversations'),  # GET for listing conversations
+    path('api/conversations/<str:conversation_id>/messages/', views.api_conversation_messages, name='api_conversation_messages'),  # GET for messages in a conversation
+    path('api/map-view/', views.api_map_view, name='api_map_view'),  # POST for map view data
+    path('api/honey/balance/', views.api_honey_balance, name='api_honey_balance'),  # GET for honey balance
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

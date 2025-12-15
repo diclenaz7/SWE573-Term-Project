@@ -25,7 +25,14 @@ SECRET_KEY = 'django-insecure-2+g-mi6*cqlyfgk7oy-+1x-3w6bwbrs)k2z#&5_g&-cp$kmi0e
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'django-app-494208442673.europe-west1.run.app']
+ALLOWED_HOSTS = [
+    'localhost', 
+    '127.0.0.1', 
+    'django-app-494208442673.europe-west1.run.app',
+    'django-app-gkihzbtmca-ew.a.run.app',
+    'react-frontend-494208442673.europe-west1.run.app',
+    'react-frontend-gkihzbtmca-ew.a.run.app',
+]
 
 
 # Application definition
@@ -38,6 +45,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'channels',
+    'core',  # The Hive core models
 ]
 
 MIDDLEWARE = [
@@ -53,16 +62,21 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "https://django-app-494208442673.europe-west1.run.app",
+    "https://django-app-gkihzbtmca-ew.a.run.app",
     "https://react-frontend-494208442673.europe-west1.run.app",
+    "https://react-frontend-gkihzbtmca-ew.a.run.app",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "https://django-app-494208442673.europe-west1.run.app",
+    "https://django-app-gkihzbtmca-ew.a.run.app",
     "https://react-frontend-494208442673.europe-west1.run.app",
+    "https://react-frontend-gkihzbtmca-ew.a.run.app",
 ]
-
-
 
 CORS_ALLOW_CREDENTIALS = True
 # Expose headers that might be needed
@@ -81,11 +95,6 @@ CORS_ALLOW_HEADERS = [
 ]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
-SESSION_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SAMESITE = "None"
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
 # Ensure session cookie is accessible across origins
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 86400  # 24 hours
@@ -111,6 +120,14 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'appsite.wsgi.application'
+ASGI_APPLICATION = 'appsite.asgi.application'
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
 
 
 # Database
@@ -121,9 +138,19 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Check if running in Cloud Run (Cloud SQL socket exists) or locally (Docker Compose)
+# Database configuration
+# Priority: Environment variables > Cloud Run > Docker Compose > Local SQLite
+
+# Check if running in Cloud Run (Cloud SQL socket exists)
 CLOUD_SQL_SOCKET = "/cloudsql/dicleshive:europe-west1:django-postgres"
 is_cloud_run = os.path.exists(CLOUD_SQL_SOCKET)
+
+# Check if running in Docker Compose (db host exists)
+is_docker = os.path.exists("/.dockerenv") or os.environ.get("DOCKER_CONTAINER") == "true"
+
+# Use environment variable to force database type, or auto-detect
+USE_POSTGRES = os.environ.get("USE_POSTGRES", "").lower() == "true"
+USE_SQLITE = os.environ.get("USE_SQLITE", "").lower() == "true"
 
 if is_cloud_run:
     # Production: Use Cloud SQL Unix socket
@@ -137,18 +164,45 @@ if is_cloud_run:
             "PASSWORD": os.environ.get("DB_PASSWORD", "django_pass"),
         }
     }
-else:
-    # Local development: Use SQLite (no setup required)
+elif is_docker or USE_POSTGRES:
+    # Docker Compose or forced PostgreSQL: Use PostgreSQL with db host
     DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "HOST": "db",
-        "PORT": os.environ.get("DB_PORT", "5432"),
-        "NAME": os.environ.get("DB_NAME", "django_db"),
-        "USER": os.environ.get("DB_USER", "django_user"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "django_pass"),
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "HOST": os.environ.get("DB_HOST", "db"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+            "NAME": os.environ.get("DB_NAME", "django_db"),
+            "USER": os.environ.get("DB_USER", "django_user"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "django_pass"),
+        }
     }
+elif USE_SQLITE or os.environ.get("DB_ENGINE") == "sqlite3":
+    # Forced SQLite or explicit SQLite setting
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
+else:
+    # Local development (default): Use SQLite for easy setup
+    # Set USE_POSTGRES=true to use PostgreSQL instead
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
+# Cookie settings - adjust for local development
+# In production/Cloud Run, these should be True/None
+# For local development, set to False/Lax
+IS_LOCAL_DEV = not is_cloud_run and not is_docker
+
+SESSION_COOKIE_SAMESITE = "Lax" if IS_LOCAL_DEV else "None"
+CSRF_COOKIE_SAMESITE = "Lax" if IS_LOCAL_DEV else "None"
+SESSION_COOKIE_SECURE = False if IS_LOCAL_DEV else True
+CSRF_COOKIE_SECURE = False if IS_LOCAL_DEV else True
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -186,6 +240,18 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Media files (User uploaded files)
+# https://docs.djangoproject.com/en/5.1/topics/files/
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Base URL for building absolute URLs for media files
+# This should be set via environment variable in production
+# Falls back to request-based URL in development if not set
+BASE_URL = os.environ.get('BASE_URL', None)
+if BASE_URL and not BASE_URL.endswith('/'):
+    BASE_URL = BASE_URL + '/'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -197,9 +263,10 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
 # Cache configuration for token storage
+# Using database cache so tokens persist across process restarts and are shared between HTTP and WebSocket
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'cache_table',
     }
 }
