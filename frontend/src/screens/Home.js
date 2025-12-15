@@ -349,12 +349,16 @@ function Home() {
               </p>
 
               <p className="hero-info">
-                {!user
-                  ? `Offer your skills or request help for everyday needs or special
-                projects. Each hour is tracked as <strong>HONEY 🍯</strong>{" "}
-                <br /> You earn honey when you help, and spend it when you
-                receive help.`
-                  : null}
+                {!user ? (
+                  <>
+                    Offer your skills or request help for everyday needs or
+                    special projects. Each hour is tracked as{" "}
+                    <strong>HONEY 🍯</strong>.
+                    <br />
+                    You earn honey when you help, and spend it when you receive
+                    help.
+                  </>
+                ) : null}
               </p>
 
               {!user && (
