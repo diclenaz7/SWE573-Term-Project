@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 
 # install deps
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --no-cache-dir -r requirements.txt
 
 # copy project
 COPY . .
@@ -23,4 +23,5 @@ ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 # Django DB will come from env vars, see below
 # Default command (can be overridden in docker-compose)
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT appsite.wsgi:application"]
+# Use daphne for ASGI/WebSocket support
+CMD ["sh", "-c", "daphne -b 0.0.0.0 -p $PORT appsite.asgi:application"]

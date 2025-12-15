@@ -445,7 +445,6 @@ class Command(BaseCommand):
                 'contact_preference': 'any',
                 'duration': '2 Hours',
                 'expires_at': now + timedelta(days=28),
-                "image": "https://media.gettyimages.com/id/1477422276/photo/male-chef-plating-food-in-plate-while-working-in-commercial-kitchen.jpg?s=1024x1024&w=gi&k=20&c=pRrN47XnI0v1HDEjrkdwGjfD7mhmNSVTBKKanKeaCLw="
             },
             {
                 'user': 'driver_alex',
@@ -460,7 +459,6 @@ class Command(BaseCommand):
                 'contact_preference': 'phone',
                 'duration': '1 Hour',
                 'expires_at': now + timedelta(days=22),
-                "image": "https://media.gettyimages.com/id/1582802930/photo/happy-man-driving-his-car.jpg?s=2048x2048&w=gi&k=20&c=CtNb9STCwUNFmZktd-5DYmbf-GB32G_fcXS-j6j1Gko=",
             },
         ]
         
