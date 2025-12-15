@@ -334,16 +334,38 @@ function Home() {
           {/* Hero Section */}
           <section className="hero-section">
             <div className="hero-content">
-              <h1 className="hero-title">Welcome to The Hive</h1>
+              <span className="hero-badge">
+                Welcome to The Hive! Community powered time exchange
+              </span>
+
+              <h1 className="hero-title">
+                Give an hour, get 🍯 <br /> Give 🍯, get an hour
+              </h1>
+
               <p className="hero-description">
                 {user
-                  ? `Hello, ${user.username}! Connect with your community and make a difference.`
-                  : "A community platform where neighbors help neighbors. Share services, request help, and build stronger connections."}
+                  ? `Welcome back, ${user.username}. Your time matters, see how you can help others or use your honey today.`
+                  : "The Hive is a community platform where neighbors help neighbors by exchanging time instead of money."}
               </p>
+
+              <p className="hero-info">
+                {!user
+                  ? `Offer your skills or request help for everyday needs or special
+                projects. Each hour is tracked as <strong>HONEY 🍯</strong>{" "}
+                <br /> You earn honey when you help, and spend it when you
+                receive help.`
+                  : null}
+              </p>
+
               {!user && (
-                <button className="hero-cta" onClick={handleGetStarted}>
-                  Get Started
-                </button>
+                <div className="hero-actions">
+                  <button
+                    className="hero-cta primary"
+                    onClick={handleGetStarted}
+                  >
+                    Get Started
+                  </button>
+                </div>
               )}
             </div>
           </section>
